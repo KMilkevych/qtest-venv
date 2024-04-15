@@ -46,3 +46,5 @@ parser.add_argument(
     type=str,
     help="the platform to run on",
 )
+
+args = parser.parse_args()

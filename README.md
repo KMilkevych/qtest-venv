@@ -25,7 +25,7 @@ options:
 
 ## Installation
 
-```
+```bash
 git clone https://github.com/anbclausen/qtest.git --recurse-submodules
-patch -p < patch.diff
+patch -p1 < patch.diff
 ```

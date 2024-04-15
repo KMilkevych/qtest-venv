@@ -60,7 +60,7 @@ def test(
     time_limit: int,
     cx_optimal: bool,
     swap_optimal: bool,
-) -> tuple[float | None, float]:
+) -> tuple[float | None, float, int, int, int]:
     """
     Run a tool on an input file on a platform with a time limit.
     
@@ -73,11 +73,13 @@ def test(
         - `swap_optimal` (bool): whether to optimize for swap count after finding a depth-optimal circuit.
 
     Returns:
-        - `tuple[float | None, float]`: a tuple containing the solver time (optional) and the total time.
+        - `tuple[float | None, float, int, int, int]`: a tuple containing the following: 
+            - solver time (optional)
+            - the total time
+            - the depth of the output circuit
+            - the cx-depth of the output circuit
+            - the swap count of the output circuit
     """
-    print(f"Running {tool} on {input} on {platform} with time limit {time_limit}s")
-    print(f"  CX-optimal: {cx_optimal}")
-    print(f"  Swap-optimal: {swap_optimal}")
 
     if tool not in TOOLS:
         raise ValueError(f"Unknown tool: '{tool}'.")
@@ -99,10 +101,15 @@ def test(
             lines = output.split("\n")
             solver_time_line = list(filter(lambda line: line.startswith("Solver time"), lines))[0]
             total_time_line = list(filter(lambda line: line.startswith("Total time"), lines))[0]
+            depth_line = list(filter(lambda line: line.startswith("Depth"), lines))[1]
 
             solver_time = float(solver_time_line.split(": ")[1].split(" ")[0])
             total_time = float(total_time_line.split(": ")[1].split(" ")[0])
-            return solver_time, total_time
+
+            def extract_number(line):
+                return int(line.split(": ")[1])
+            depth, cx_depth, swap_count = map(extract_number, depth_line.split(", "))
+            return solver_time, total_time, depth, cx_depth, swap_count
         case "q-synth":
             raise NotImplementedError("Q-Synth is not yet implemented.")
         case "olsq2":
@@ -113,8 +120,17 @@ def test(
             raise NotImplementedError("Sabre is not yet implemented.")
         case _:
             raise ValueError(f"Unknown tool: '{tool}'.")
-            
-solver_time, total_time = test(args.tool, args.input, args.platform, args.time_limit, args.cx_optimal, args.swap_optimal)
 
+
+print(f"Running {args.tool} on {args.input} on {args.platform} with time limit {args.time_limit}s")
+print(f"  CX-optimal: {args.cx_optimal}")
+print(f"  Swap-optimal: {args.swap_optimal}")
+solver_time, total_time, depth, cx_depth, swap_count = test(args.tool, args.input, args.platform, args.time_limit, args.cx_optimal, args.swap_optimal)
+
+print()
+print("OUTPUT")
 print(f"Solver time: {solver_time}s")
 print(f"Total time: {total_time}s")
+print(f"Depth: {depth}")
+print(f"CX-depth: {cx_depth}")
+print(f"Swap count: {swap_count}")

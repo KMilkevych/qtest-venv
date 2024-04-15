@@ -111,6 +111,18 @@ def test(
             depth, cx_depth, swap_count = map(extract_number, depth_line.split(", "))
             return solver_time, total_time, depth, cx_depth, swap_count
         case "q-synth":
+            if cx_optimal:
+                raise ValueError("CX-optimal is not supported by q-synth.")
+            if not swap_optimal:
+                raise ValueError("Swap-optimal must be enabled for q-synth.")
+            
+            command = f"poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v1 {input} -t {time_limit} > tmp/output.txt" 
+            os.system(command)
+
+            with open("tmp/output.txt", "r") as f:
+                output = f.read()
+
+            lines = output.split("\n")
             raise NotImplementedError("Q-Synth is not yet implemented.")
         case "olsq2":
             raise NotImplementedError("OLSQ2 is not yet implemented.")

@@ -5,4 +5,3 @@ if [ $# -ne 0 ]
   else 
     poetry run python run.py
 fi
-

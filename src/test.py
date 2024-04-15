@@ -1,5 +1,6 @@
 import os
 import argparse
+import time
 
 DEFAULT_TIME_LIMIT_S = 600
 TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
@@ -35,7 +36,7 @@ parser.add_argument(
 parser.add_argument(
     "tool",
     type=str,
-    help=f"the tool to use, one of {", ".join(TOOLS)}",
+    help=f"the tool to use, one of {', '.join(TOOLS)}",
 )
 
 parser.add_argument(
@@ -47,7 +48,7 @@ parser.add_argument(
 parser.add_argument(
     "platform",
     type=str,
-    help=f"the platform to run on, one of {", ".join(PLATFORMS)}",
+    help=f"the platform to run on, one of {', '.join(PLATFORMS)}",
 )
 
 args = parser.parse_args()
@@ -116,14 +117,20 @@ def test(
             if not swap_optimal:
                 raise ValueError("Swap-optimal must be enabled for q-synth.")
             
-            command = f"poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v1 {input} -t {time_limit} > tmp/output.txt" 
+            command = f"cd Q-Synth && poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v1 ../{input} -t {time_limit} > ../tmp/output.txt" 
+            before = time.time()
             os.system(command)
+            after = time.time()
+            total_time = after - before
 
             with open("tmp/output.txt", "r") as f:
                 output = f.read()
 
             lines = output.split("\n")
-            raise NotImplementedError("Q-Synth is not yet implemented.")
+            solver_time_line = list(filter(lambda line: line.startswith("Encoding time: "), lines))[0]
+            solver_time = float(solver_time_line.split(": ")[1])
+            
+            return solver_time, total_time, 0, 0, 0
         case "olsq2":
             raise NotImplementedError("OLSQ2 is not yet implemented.")
         case "tb-olsq2":
@@ -141,8 +148,11 @@ solver_time, total_time, depth, cx_depth, swap_count = test(args.tool, args.inpu
 
 print()
 print("OUTPUT")
-print(f"Solver time: {solver_time}s")
-print(f"Total time: {total_time}s")
+if solver_time is not None:
+    print(f"Solver time: {solver_time:.03f}s")
+else:
+    print("Solver time: N/A")
+print(f"Total time: {total_time:.03f}s")
 print(f"Depth: {depth}")
 print(f"CX-depth: {cx_depth}")
 print(f"Swap count: {swap_count}")

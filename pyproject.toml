@@ -12,6 +12,7 @@ python-sat = {extras = ["aiger", "approxmc", "cryptosat", "pblib"], version = "^
 qiskit-aer = "^0.13.3"
 matplotlib = "^3.8.3"
 qiskit-ibm-runtime = "^0.22.0"
+rustworkx = "^0.14.2"
 
 
 [build-system]

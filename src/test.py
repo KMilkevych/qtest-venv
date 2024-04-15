@@ -7,7 +7,7 @@ PLATFORMS = ["melbourne"]
 
 parser = argparse.ArgumentParser(
     description="A tool for testing and comparing qt, q-synth, olsq2, tb-olsq2 and sabre.",
-    prog="./run",
+    prog="./test",
 )
 
 parser.add_argument(

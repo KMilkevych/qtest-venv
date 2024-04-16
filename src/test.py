@@ -1,10 +1,67 @@
 import os
+import subprocess
 import argparse
+import datetime
 import time
+
+from qiskit import QuantumCircuit, QuantumRegister
 
 DEFAULT_TIME_LIMIT_S = 600
 TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
 PLATFORMS = ["melbourne"]
+
+
+def run(command: str, path: str):
+    """
+    Run a command in a given path.
+    """
+    print(f"Running '{command}' in '{path}'")
+    return subprocess.check_output(
+        f"cd {path}; source .venv/bin/activate; {command}", shell=True
+    ).decode("utf-8")
+
+
+def remove_all_non_cx_gates(circuit: QuantumCircuit) -> QuantumCircuit:
+    """
+    Remove all non-CX gates from the circuit.
+    """
+    num_qubits = circuit.num_qubits
+    qubit_name = circuit.qregs[0].name
+    new_circuit = QuantumCircuit(QuantumRegister(num_qubits, qubit_name))
+    for instr in circuit.data:
+        if instr[0].name == "cx":
+            new_circuit.append(instr[0], instr[1])
+
+    return new_circuit
+
+
+def count_swaps(circuit: QuantumCircuit):
+    """
+    Counts SWAP gates in a circuit.
+    """
+    swaps = 0
+    for instr in circuit.data:
+        if instr[0].name.startswith("swap"):
+            swaps += 1
+
+    return swaps
+
+
+def with_swaps_as_cnots(circuit: QuantumCircuit, register_name: str):
+    """
+    Replaces all SWAP gates with CNOT gates.
+    """
+    new_circuit = QuantumCircuit(QuantumRegister(circuit.num_qubits, register_name))
+    for instr in circuit.data:
+        if instr[0].name.startswith("swap"):
+            new_circuit.cx(instr[1][0]._index, instr[1][1]._index)
+            new_circuit.cx(instr[1][1]._index, instr[1][0]._index)
+            new_circuit.cx(instr[1][0]._index, instr[1][1]._index)
+        else:
+            new_circuit.append(instr[0], instr[1])
+
+    return new_circuit
+
 
 parser = argparse.ArgumentParser(
     description="A tool for testing and comparing qt, q-synth, olsq2, tb-olsq2 and sabre.",
@@ -64,7 +121,7 @@ def test(
 ) -> tuple[float | None, float, int, int, int]:
     """
     Run a tool on an input file on a platform with a time limit.
-    
+
     Args:
         - `tool` (str): the tool to use, one of {", ".join(TOOLS)}.
         - `input` (str): the path to the input file.
@@ -74,7 +131,7 @@ def test(
         - `swap_optimal` (bool): whether to optimize for swap count after finding a depth-optimal circuit.
 
     Returns:
-        - `tuple[float | None, float, int, int, int]`: a tuple containing the following: 
+        - `tuple[float | None, float, int, int, int]`: a tuple containing the following:
             - solver time (optional)
             - the total time
             - the depth of the output circuit
@@ -86,22 +143,29 @@ def test(
         raise ValueError(f"Unknown tool: '{tool}'.")
     if platform not in PLATFORMS:
         raise ValueError(f"Unknown platform: '{platform}'.")
-    
+
     os.makedirs("tmp", exist_ok=True)
     with open("tmp/output.txt", "w") as f:
         f.write("")
-    
+
     match tool:
         case "qt":
-            command = f"cd qt && ./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc > ../tmp/output.txt"
-            os.system(command)
-
-            with open("tmp/output.txt", "r") as f:
-                output = f.read()
+            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc"
+            output = run(command, "qt")
 
             lines = output.split("\n")
-            solver_time_line = list(filter(lambda line: line.startswith("Solver time"), lines))[0]
-            total_time_line = list(filter(lambda line: line.startswith("Total time"), lines))[0]
+            match swap_optimal:
+                case True:
+                    solver_time_line = list(
+                        filter(lambda line: line.startswith("Total solver time"), lines)
+                    )[0]
+                case False:
+                    solver_time_line = list(
+                        filter(lambda line: line.startswith("Solver time"), lines)
+                    )[0]
+            total_time_line = list(
+                filter(lambda line: line.startswith("Total time"), lines)
+            )[0]
             depth_line = list(filter(lambda line: line.startswith("Depth"), lines))[1]
 
             solver_time = float(solver_time_line.split(": ")[1].split(" ")[0])
@@ -109,28 +173,55 @@ def test(
 
             def extract_number(line):
                 return int(line.split(": ")[1])
+
             depth, cx_depth, swap_count = map(extract_number, depth_line.split(", "))
             return solver_time, total_time, depth, cx_depth, swap_count
+
         case "q-synth":
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by q-synth.")
             if not swap_optimal:
                 raise ValueError("Swap-optimal must be enabled for q-synth.")
-            
-            command = f"cd Q-Synth && poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v1 ../{input} -t {time_limit} > ../tmp/output.txt" 
-            before = time.time()
-            os.system(command)
-            after = time.time()
-            total_time = after - before
 
-            with open("tmp/output.txt", "r") as f:
-                output = f.read()
+            command = f"poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v1 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
+            output = run(command, "Q-Synth")
 
             lines = output.split("\n")
-            solver_time_line = list(filter(lambda line: line.startswith("Encoding time: "), lines))[0]
+
+            start_time_line = list(
+                filter(lambda line: line.startswith("Start time: "), lines)
+            )[0]
+            finish_time_line = list(
+                filter(lambda line: line.startswith("Finish time: "), lines)
+            )[0]
+            start_time = datetime.datetime.fromisoformat(start_time_line.split(": ")[1])
+            finish_time = datetime.datetime.fromisoformat(
+                finish_time_line.split(": ")[1]
+            )
+            total_time = (finish_time - start_time).total_seconds()
+            solver_time_line = list(
+                filter(lambda line: line.startswith("Encoding time: "), lines)
+            )[0]
             solver_time = float(solver_time_line.split(": ")[1])
-            
-            return solver_time, total_time, 0, 0, 0
+
+            # remove measurements from output file
+            with open("tmp/output.qasm", "r") as f:
+                lines = f.readlines()
+            with open("tmp/output.qasm", "w") as f:
+                for line in lines:
+                    measure_line = line.startswith("measure")
+                    barrier_line = line.startswith("barrier")
+                    if not measure_line and not barrier_line:
+                        f.write(line)
+
+            circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
+            cx_circuit = with_swaps_as_cnots(circuit, "q")
+            cx_circuit_only = remove_all_non_cx_gates(cx_circuit)
+            depth = cx_circuit.depth()
+            cx_depth = cx_circuit_only.depth()
+            swap_count = count_swaps(circuit)
+
+            return solver_time, total_time, depth, cx_depth, swap_count
         case "olsq2":
             raise NotImplementedError("OLSQ2 is not yet implemented.")
         case "tb-olsq2":
@@ -141,10 +232,19 @@ def test(
             raise ValueError(f"Unknown tool: '{tool}'.")
 
 
-print(f"Running {args.tool} on {args.input} on {args.platform} with time limit {args.time_limit}s")
+print(
+    f"Running {args.tool} on {args.input} on {args.platform} with time limit {args.time_limit}s"
+)
 print(f"  CX-optimal: {args.cx_optimal}")
 print(f"  Swap-optimal: {args.swap_optimal}")
-solver_time, total_time, depth, cx_depth, swap_count = test(args.tool, args.input, args.platform, args.time_limit, args.cx_optimal, args.swap_optimal)
+solver_time, total_time, depth, cx_depth, swap_count = test(
+    args.tool,
+    args.input,
+    args.platform,
+    args.time_limit,
+    args.cx_optimal,
+    args.swap_optimal,
+)
 
 print()
 print("OUTPUT")

@@ -2,6 +2,8 @@
 
 A tool for comparing and testing `qt`, `q-synth`, `olsq2`, `tb-olsq2` and `sabre`.
 
+> Note: Works only for UNIX systems.
+
 ## Usage
 
 ```bash
@@ -25,7 +27,16 @@ options:
 
 ## Installation
 
+It is important to carry out the installation in this order:
+
 ```bash
 git clone https://github.com/anbclausen/qtest.git --recurse-submodules
+cd qtest/qt
+poetry install
+cd ..
+cd Q-Synth
+poetry install
+cd ..
+poetry install
 patch -p1 < patch.diff
 ```

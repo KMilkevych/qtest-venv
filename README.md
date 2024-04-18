@@ -32,6 +32,7 @@ It is important to carry out the installation in this order:
 ```bash
 git clone https://github.com/anbclausen/qtest.git --recurse-submodules
 cd qtest
+git submodule update --recursive --init 
 patch -p1 < patch.diff
 cd qt
 poetry install
@@ -53,4 +54,4 @@ Run in project root:
 git --no-pager diff --no-color --submodule=diff > patch.diff 
 ```
 
-Note: Remember to delete the old file before generating the new.
+Note: Remember to delete the old file before generating the new. Also remember to `git add` untracked files before running the command above.

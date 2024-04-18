@@ -28,8 +28,9 @@ def run(command: str, path: str):
     Run a command in a given path.
     """
     print(f"Running '{command}' in '{path}'")
+    command_string = f"cd {path}; source .venv/bin/activate; {command}"
     return subprocess.check_output(
-        f"cd {path}; source .venv/bin/activate; {command}", shell=True
+        f"/bin/bash -c \"{command_string}\"", shell=True
     ).decode("utf-8")
 
 
@@ -205,7 +206,7 @@ def test(
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by OLSQ2.")
             command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
-            output = run(command, "olsq2")
+            output = run(command, "OLSQ2")
 
             lines = output.split("\n")
             total_time_line = list(
@@ -250,7 +251,7 @@ def test(
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by OLSQ2.")
             command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
-            output = run(command, "olsq2")
+            output = run(command, "OLSQ2")
 
             lines = output.split("\n")
             total_time_line = list(

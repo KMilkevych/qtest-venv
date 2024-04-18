@@ -2,8 +2,12 @@ import os
 import subprocess
 import argparse
 import datetime
+import time
 
 from qiskit import QuantumCircuit
+from qiskit.transpiler.passes import SabreLayout
+from qiskit.transpiler import CouplingMap
+from qiskit.converters import circuit_to_dag, dag_to_circuit
 from itertools import takewhile
 from circuits import (
     LogicalQubit,
@@ -132,7 +136,7 @@ def test(
                 filter(lambda line: line.startswith("Total time"), lines)
             )[0]
 
-            solver_time = float(solver_time_line.split(": ")[1].split(" ")[0])
+            total_time = float(solver_time_line.split(": ")[1].split(" ")[0])
             total_time = float(total_time_line.split(": ")[1].split(" ")[0])
 
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
@@ -143,7 +147,7 @@ def test(
                 LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
                 for raw in raw_initial_mapping
             }
-            return solver_time, total_time, circuit, initial_mapping
+            return total_time, total_time, circuit, initial_mapping
 
         case "q-synth":
             if cx_optimal:
@@ -170,7 +174,7 @@ def test(
             solver_time_line = list(
                 filter(lambda line: line.startswith("Encoding time: "), lines)
             )[0]
-            solver_time = float(solver_time_line.split(": ")[1])
+            total_time = float(solver_time_line.split(": ")[1])
 
             # remove measurements from output file
             with open("tmp/output.qasm", "r") as f:
@@ -196,7 +200,7 @@ def test(
             }
 
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            return solver_time, total_time, circuit, initial_mapping
+            return total_time, total_time, circuit, initial_mapping
         case "olsq2":
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by OLSQ2.")
@@ -288,13 +292,44 @@ def test(
             )
             return None, total_time, circuit, initial_mapping
         case "sabre":
-            raise NotImplementedError("Sabre is not yet implemented.")
+            melbourne_coupling_map = [
+                [1, 0],
+                [1, 2],
+                [2, 3],
+                [4, 3],
+                [4, 10],
+                [5, 4],
+                [5, 6],
+                [5, 9],
+                [6, 8],
+                [7, 8],
+                [9, 8],
+                [9, 10],
+                [11, 3],
+                [11, 10],
+                [11, 12],
+                [12, 2],
+                [13, 1],
+                [13, 12],
+            ]
+            circuit = QuantumCircuit.from_qasm_file(input)
+            sabre = SabreLayout(CouplingMap(melbourne_coupling_map))
+            dag = circuit_to_dag(circuit)
+
+            before = time.time()
+            res = sabre.run(dag)
+            after = time.time()
+            total_time = after - before
+
+            result_circuit = dag_to_circuit(res)
+            return None, total_time, result_circuit, {}
         case _:
             raise ValueError(f"Unknown tool: '{tool}'.")
 
 
 """
 TODO
+- Add initial mapping for SABRE
 - What to do with timeouts
 - Add validation
 - Add simulation

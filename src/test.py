@@ -330,6 +330,9 @@ def test(
 """
 TODO
 - Add initial mapping for SABRE
+- Enable CX-optimal for OLSQ2
+- Q-Synth should always be CX-optimal
+- Add qt_no_anc tool or ancilaries flag
 - What to do with timeouts
 - Add validation
 - Add simulation

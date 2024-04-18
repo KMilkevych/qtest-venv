@@ -52,3 +52,5 @@ Run in project root:
 ```bash
 git --no-pager diff --no-color --submodule=diff > patch.diff 
 ```
+
+Note: Remember to delete the old file before generating the new.

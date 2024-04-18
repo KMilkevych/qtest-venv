@@ -4,3 +4,6 @@
 [submodule "Q-Synth"]
 	path = Q-Synth
 	url = https://github.com/irfansha/Q-Synth.git
+[submodule "OLSQ2"]
+	path = OLSQ2
+	url = https://github.com/UCLA-VAST/OLSQ2.git

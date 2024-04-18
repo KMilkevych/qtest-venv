@@ -4,12 +4,12 @@ import argparse
 import datetime
 
 from qiskit import QuantumCircuit
-from circuits import get_stats
+from circuits import get_stats, parse_olsq2_circuit, InitialMapping
 
 
 DEFAULT_TIME_LIMIT_S = 600
 TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
-PLATFORMS = ["melbourne"]
+PLATFORMS = {"melbourne": 14}
 
 
 def run(command: str, path: str):
@@ -64,7 +64,7 @@ parser.add_argument(
 parser.add_argument(
     "platform",
     type=str,
-    help=f"the platform to run on, one of {', '.join(PLATFORMS)}",
+    help=f"the platform to run on, one of {', '.join(PLATFORMS.keys())}",
 )
 
 args = parser.parse_args()
@@ -77,28 +77,29 @@ def test(
     time_limit: int,
     cx_optimal: bool,
     swap_optimal: bool,
-) -> tuple[float | None, float, QuantumCircuit]:
+) -> tuple[float | None, float, QuantumCircuit, InitialMapping]:
     """
     Run a tool on an input file on a platform with a time limit.
 
     Args:
         - `tool` (str): the tool to use, one of {", ".join(TOOLS)}.
         - `input` (str): the path to the input file.
-        - `platform` (str): the platform to run on, one of {", ".join(PLATFORMS)}.
+        - `platform` (str): the platform to run on.
         - `time_limit` (int): the time limit in seconds.
         - `cx_optimal` (bool): whether to optimize for cx-depth.
         - `swap_optimal` (bool): whether to optimize for swap count after finding a depth-optimal circuit.
 
     Returns:
-        - `tuple[float | None, float, QuantumCircuit]`: a tuple containing the following:
+        - `tuple[float | None, float, QuantumCircuit, InitialMapping]`: a tuple containing the following:
             - solver time (optional)
             - the total time
             - the output circuit
+            - the initial mapping of the output circuit
     """
 
     if tool not in TOOLS:
         raise ValueError(f"Unknown tool: '{tool}'.")
-    if platform not in PLATFORMS:
+    if platform not in PLATFORMS.keys():
         raise ValueError(f"Unknown platform: '{platform}'.")
 
     os.makedirs("tmp", exist_ok=True)
@@ -170,7 +171,30 @@ def test(
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
             return solver_time, total_time, circuit
         case "olsq2":
-            raise NotImplementedError("OLSQ2 is not yet implemented.")
+            if cx_optimal:
+                raise ValueError("CX-optimal is not supported by OLSQ2.")
+            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp"
+            output = run(command, "olsq2")
+
+            lines = output.split("\n")
+            total_time_line = list(
+                filter(lambda line: line.startswith("Total compilation time"), lines)
+            )[0]
+            total_time = float(total_time_line.split(" = ")[1][:-1])
+
+            gate_lines = list(
+                filter(
+                    lambda line: line.startswith("SWAP") or line.startswith("Gate"),
+                    lines,
+                )
+            )
+
+            input_name = input.split("/")[-1].split(".")[0]
+            platform_depth = PLATFORMS[platform]
+            circuit, initial_mapping = parse_olsq2_circuit(
+                f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
+            )
+            return None, total_time, circuit, initial_mapping
         case "tb-olsq2":
             raise NotImplementedError("TB-OLSQ2 is not yet implemented.")
         case "sabre":
@@ -180,11 +204,10 @@ def test(
 
 
 """
-            cx_circuit = with_swaps_as_cnots(circuit, "q")
-            cx_circuit_only = remove_all_non_cx_gates(cx_circuit)
-            depth = cx_circuit.depth()
-            cx_depth = cx_circuit_only.depth()
-            swap_count = count_swaps(circuit)
+TODO
+- What to do with timeouts
+- Add validation
+- Add simulation
 """
 
 print(
@@ -192,7 +215,7 @@ print(
 )
 print(f"  CX-optimal: {args.cx_optimal}")
 print(f"  Swap-optimal: {args.swap_optimal}")
-solver_time, total_time, circuit = test(
+solver_time, total_time, circuit, initial_mapping = test(
     args.tool,
     args.input,
     args.platform,

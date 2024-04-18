@@ -4,7 +4,7 @@ import argparse
 import datetime
 
 from qiskit import QuantumCircuit
-from circuits import with_swaps_as_cnots, remove_all_non_cx_gates, count_swaps
+from circuits import get_stats
 
 
 DEFAULT_TIME_LIMIT_S = 600
@@ -77,7 +77,7 @@ def test(
     time_limit: int,
     cx_optimal: bool,
     swap_optimal: bool,
-) -> tuple[float | None, float, int, int, int]:
+) -> tuple[float | None, float, QuantumCircuit]:
     """
     Run a tool on an input file on a platform with a time limit.
 
@@ -90,12 +90,10 @@ def test(
         - `swap_optimal` (bool): whether to optimize for swap count after finding a depth-optimal circuit.
 
     Returns:
-        - `tuple[float | None, float, int, int, int]`: a tuple containing the following:
+        - `tuple[float | None, float, QuantumCircuit]`: a tuple containing the following:
             - solver time (optional)
             - the total time
-            - the depth of the output circuit
-            - the cx-depth of the output circuit
-            - the swap count of the output circuit
+            - the output circuit
     """
 
     if tool not in TOOLS:
@@ -109,7 +107,7 @@ def test(
 
     match tool:
         case "qt":
-            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc"
+            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc -out ../tmp/output.qasm"
             output = run(command, "qt")
 
             lines = output.split("\n")
@@ -125,16 +123,12 @@ def test(
             total_time_line = list(
                 filter(lambda line: line.startswith("Total time"), lines)
             )[0]
-            depth_line = list(filter(lambda line: line.startswith("Depth"), lines))[1]
 
             solver_time = float(solver_time_line.split(": ")[1].split(" ")[0])
             total_time = float(total_time_line.split(": ")[1].split(" ")[0])
 
-            def extract_number(line):
-                return int(line.split(": ")[1])
-
-            depth, cx_depth, swap_count = map(extract_number, depth_line.split(", "))
-            return solver_time, total_time, depth, cx_depth, swap_count
+            circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
+            return solver_time, total_time, circuit
 
         case "q-synth":
             if cx_optimal:
@@ -174,13 +168,7 @@ def test(
                         f.write(line)
 
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            cx_circuit = with_swaps_as_cnots(circuit, "q")
-            cx_circuit_only = remove_all_non_cx_gates(cx_circuit)
-            depth = cx_circuit.depth()
-            cx_depth = cx_circuit_only.depth()
-            swap_count = count_swaps(circuit)
-
-            return solver_time, total_time, depth, cx_depth, swap_count
+            return solver_time, total_time, circuit
         case "olsq2":
             raise NotImplementedError("OLSQ2 is not yet implemented.")
         case "tb-olsq2":
@@ -191,12 +179,20 @@ def test(
             raise ValueError(f"Unknown tool: '{tool}'.")
 
 
+"""
+            cx_circuit = with_swaps_as_cnots(circuit, "q")
+            cx_circuit_only = remove_all_non_cx_gates(cx_circuit)
+            depth = cx_circuit.depth()
+            cx_depth = cx_circuit_only.depth()
+            swap_count = count_swaps(circuit)
+"""
+
 print(
     f"Running {args.tool} on {args.input} on {args.platform} with time limit {args.time_limit}s"
 )
 print(f"  CX-optimal: {args.cx_optimal}")
 print(f"  Swap-optimal: {args.swap_optimal}")
-solver_time, total_time, depth, cx_depth, swap_count = test(
+solver_time, total_time, circuit = test(
     args.tool,
     args.input,
     args.platform,
@@ -204,6 +200,8 @@ solver_time, total_time, depth, cx_depth, swap_count = test(
     args.cx_optimal,
     args.swap_optimal,
 )
+
+depth, cx_depth, swap_count = get_stats(circuit)
 
 print()
 print("OUTPUT")

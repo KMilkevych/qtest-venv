@@ -41,3 +41,15 @@ def with_swaps_as_cnots(circuit: QuantumCircuit, register_name: str):
             new_circuit.append(instr[0], instr[1])
 
     return new_circuit
+
+
+def get_stats(circuit: QuantumCircuit):
+    """
+    Get circuit statistics.
+    """
+    cx_circuit = with_swaps_as_cnots(circuit, "q")
+    cx_circuit_only = remove_all_non_cx_gates(cx_circuit)
+    depth = cx_circuit.depth()
+    cx_depth = cx_circuit_only.depth()
+    swap_count = count_swaps(circuit)
+    return depth, cx_depth, swap_count

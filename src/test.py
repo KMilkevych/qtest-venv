@@ -200,7 +200,7 @@ def test(
         case "olsq2":
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by OLSQ2.")
-            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp"
+            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
             output = run(command, "olsq2")
 
             lines = output.split("\n")
@@ -245,7 +245,7 @@ def test(
         case "tb-olsq2":
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by OLSQ2.")
-            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran"
+            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
             output = run(command, "olsq2")
 
             lines = output.split("\n")

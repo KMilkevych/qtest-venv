@@ -44,3 +44,11 @@ poetry install
 cd ..
 poetry install
 ```
+
+## Updating the patch file
+
+Run in project root:
+
+```bash
+git --no-pager diff --no-color --submodule=diff > patch.diff 
+```

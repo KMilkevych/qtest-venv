@@ -150,7 +150,7 @@ def test(
             if not swap_optimal:
                 raise ValueError("Swap-optimal must be enabled for q-synth.")
 
-            command = f"poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v1 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
+            command = f"poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
             output = run(command, "Q-Synth")
 
             lines = output.split("\n")
@@ -181,8 +181,21 @@ def test(
                     if not measure_line and not barrier_line:
                         f.write(line)
 
+            initial_mapping_lines = list(
+                filter(lambda line: line.startswith("...initially mapping"), lines)
+            )
+            raw_initial_mapping = [
+                (parts[2], parts[4])
+                for initial_mapping_line in initial_mapping_lines
+                for parts in initial_mapping_line.split(" ")
+            ]
+            initial_mapping = {
+                LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
+                for raw in raw_initial_mapping
+            }
+
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            return solver_time, total_time, circuit
+            return solver_time, total_time, circuit, initial_mapping
         case "olsq2":
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by OLSQ2.")

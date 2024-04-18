@@ -4,6 +4,7 @@ import argparse
 import datetime
 
 from qiskit import QuantumCircuit
+from itertools import takewhile
 from circuits import (
     LogicalQubit,
     PhysicalQubit,
@@ -214,6 +215,26 @@ def test(
                     lines,
                 )
             )
+            # OLSQ2 outputs gates many times.
+            # We want the final gate list.
+            # We reverse the list so these gates appear at the beginning.
+            gate_lines.reverse()
+            gate_0_index = gate_lines.index(
+                list(filter(lambda line: line.startswith("Gate 0"), gate_lines))[0]
+            )
+            stop_index = (
+                gate_0_index
+                + len(
+                    list(
+                        takewhile(
+                            lambda s: s.startswith("SWAP"),
+                            gate_lines[gate_0_index + 1 :],
+                        )
+                    )
+                )
+                + 1
+            )
+            gate_lines = gate_lines[:stop_index]
 
             input_name = input.split("/")[-1].split(".")[0]
             platform_depth = PLATFORMS[platform]
@@ -222,7 +243,50 @@ def test(
             )
             return None, total_time, circuit, initial_mapping
         case "tb-olsq2":
-            raise NotImplementedError("TB-OLSQ2 is not yet implemented.")
+            if cx_optimal:
+                raise ValueError("CX-optimal is not supported by OLSQ2.")
+            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran"
+            output = run(command, "olsq2")
+
+            lines = output.split("\n")
+            total_time_line = list(
+                filter(lambda line: line.startswith("Total compilation time"), lines)
+            )[0]
+            total_time = float(total_time_line.split(" = ")[1][:-1])
+
+            gate_lines = list(
+                filter(
+                    lambda line: line.startswith("SWAP") or line.startswith("Gate"),
+                    lines,
+                )
+            )
+            # OLSQ2 outputs gates many times.
+            # We want the final gate list.
+            # We reverse the list so these gates appear at the beginning.
+            gate_lines.reverse()
+            gate_0_index = gate_lines.index(
+                list(filter(lambda line: line.startswith("Gate 0"), gate_lines))[0]
+            )
+            stop_index = (
+                gate_0_index
+                + len(
+                    list(
+                        takewhile(
+                            lambda s: s.startswith("SWAP"),
+                            gate_lines[gate_0_index + 1 :],
+                        )
+                    )
+                )
+                + 1
+            )
+            gate_lines = gate_lines[:stop_index]
+
+            input_name = input.split("/")[-1].split(".")[0]
+            platform_depth = PLATFORMS[platform]
+            circuit, initial_mapping = parse_olsq2_circuit(
+                f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
+            )
+            return None, total_time, circuit, initial_mapping
         case "sabre":
             raise NotImplementedError("Sabre is not yet implemented.")
         case _:

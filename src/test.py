@@ -4,7 +4,13 @@ import argparse
 import datetime
 
 from qiskit import QuantumCircuit
-from circuits import get_stats, parse_olsq2_circuit, InitialMapping
+from circuits import (
+    LogicalQubit,
+    PhysicalQubit,
+    get_stats,
+    parse_olsq2_circuit,
+    InitialMapping,
+)
 
 
 DEFAULT_TIME_LIMIT_S = 600
@@ -108,7 +114,7 @@ def test(
 
     match tool:
         case "qt":
-            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc -out ../tmp/output.qasm"
+            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
             output = run(command, "qt")
 
             lines = output.split("\n")
@@ -129,7 +135,14 @@ def test(
             total_time = float(total_time_line.split(": ")[1].split(" ")[0])
 
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            return solver_time, total_time, circuit
+            with open("tmp/initial_mapping.txt", "r") as f:
+                lines = f.readlines()
+            raw_initial_mapping = [line.split(" -> ") for line in lines]
+            initial_mapping = {
+                LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
+                for raw in raw_initial_mapping
+            }
+            return solver_time, total_time, circuit, initial_mapping
 
         case "q-synth":
             if cx_optimal:

@@ -31,12 +31,16 @@ It is important to carry out the installation in this order:
 
 ```bash
 git clone https://github.com/anbclausen/qtest.git --recurse-submodules
-cd qtest/qt
+cd qtest
+patch -p1 < patch.diff
+cd qt
 poetry install
 cd ..
 cd Q-Synth
 poetry install
 cd ..
+cd OLSQ2
 poetry install
-patch -p1 < patch.diff
+cd ..
+poetry install
 ```

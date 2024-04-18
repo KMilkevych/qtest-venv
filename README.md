@@ -55,3 +55,13 @@ git --no-pager diff --no-color --submodule=diff > patch.diff
 ```
 
 Note: Remember to delete the old file before generating the new. Also remember to `git add` untracked files before running the command above.
+
+## Container
+
+NOTE: Run
+
+```bash
+git submodule update --recursive --init 
+```
+
+Before opening the repo in Docker.

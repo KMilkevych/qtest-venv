@@ -8,10 +8,9 @@ RUN apt-get -qq -y install git
 RUN pip install poetry
 RUN poetry config virtualenvs.in-project true
 
-COPY . .
+WORKDIR /workspaces/qtest
 
 # Install project dependencies
-RUN git submodule update --recursive --init 
 RUN patch -p1 < patch.diff
 RUN cd qt
 RUN poetry install
@@ -23,3 +22,4 @@ RUN cd OLSQ2
 RUN poetry install
 RUN cd ..
 RUN poetry install
+

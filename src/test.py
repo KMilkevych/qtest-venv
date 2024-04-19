@@ -4,9 +4,10 @@ import argparse
 import datetime
 import time
 
-from qiskit import QuantumCircuit
+from qiskit import QuantumCircuit, QuantumRegister
+from qiskit.circuit import Qubit
 from qiskit.transpiler.passes import SabreLayout
-from qiskit.transpiler import CouplingMap
+from qiskit.transpiler import CouplingMap, Layout
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from itertools import takewhile
 from circuits import (
@@ -30,7 +31,7 @@ def run(command: str, path: str):
     print(f"Running '{command}' in '{path}'")
     command_string = f"cd {path}; source .venv/bin/activate; {command}"
     return subprocess.check_output(
-        f"/bin/bash -c \"{command_string}\"", shell=True
+        f'/bin/bash -c "{command_string}"', shell=True
     ).decode("utf-8")
 
 
@@ -149,7 +150,6 @@ def test(
                 for raw in raw_initial_mapping
             }
             return total_time, total_time, circuit, initial_mapping
-
         case "q-synth":
             if cx_optimal:
                 raise ValueError("CX-optimal is not supported by q-synth.")
@@ -323,14 +323,33 @@ def test(
             total_time = after - before
 
             result_circuit = dag_to_circuit(res)
-            return None, total_time, result_circuit, {}
+            initial_mapping: InitialMapping = {}
+            sabre_layout = sabre.property_set.get("layout")
+
+            # make the type checker happy
+            if isinstance(sabre_layout, Layout):
+                for p, q in sabre_layout.get_physical_bits().items():
+                    # make the type checker happy
+                    if (
+                        isinstance(q, Qubit)
+                        and isinstance(q._register, QuantumRegister)
+                        and isinstance(q._index, int)
+                        and isinstance(p, int)
+                    ):
+                        if q._register.name == "q":
+                            initial_mapping[LogicalQubit(q._index)] = PhysicalQubit(p)
+                    else:
+                        raise ValueError(f"Something is wrong in SABRE's initial mapping:\n{sabre_layout}")
+            else:
+                raise ValueError(f"SABRE did not produce an initial mapping")
+
+            return None, total_time, result_circuit, initial_mapping
         case _:
             raise ValueError(f"Unknown tool: '{tool}'.")
 
 
 """
 TODO
-- Add initial mapping for SABRE
 - Enable CX-optimal for OLSQ2
 - Q-Synth should always be CX-optimal
 - Add qt_no_anc tool or ancilaries flag

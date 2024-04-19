@@ -47,6 +47,47 @@ def put_in_queue(queue: Queue, command: str, path: str):
     queue.put(run(command, path))
 
 
+CSV_OUTPUT_FILE = "tmp/output.csv"
+if not os.path.exists(CSV_OUTPUT_FILE):
+    os.makedirs(os.path.dirname(CSV_OUTPUT_FILE), exist_ok=True)
+    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Success rate (%)"
+    with open(CSV_OUTPUT_FILE, "a") as f:
+        f.write(line + "\n")
+
+
+def output_csv(
+    tool: str,
+    cx_opt: bool,
+    swap_opt: bool,
+    anc: bool,
+    input: str,
+    platform: str,
+    result: (
+        tuple[float | None, float, int, int, int, float | None] | Literal["ERROR", "TO"]
+    ),
+):
+    line = f"{tool};{cx_opt};{swap_opt};{anc};{input};{platform};"
+    if isinstance(result, str):
+        line += f";{result};;;;;"
+    else:
+        solver_time = result[0]
+        total_time = result[1]
+        depth = result[2]
+        cx_depth = result[3]
+        swaps = result[4]
+        success_rate = result[5]
+
+        if solver_time == None:
+            line += f";"
+        else:
+            line += f"{solver_time:.3f};"
+        line += f"{total_time:.3f};{depth};{cx_depth};{swaps};"
+        if success_rate != None:
+            line += f"{success_rate:.3f}"
+    with open(CSV_OUTPUT_FILE, "a") as f:
+        f.write(line + "\n")
+
+
 parser = argparse.ArgumentParser(
     description="A tool for testing and comparing qt, q-synth, olsq2, tb-olsq2 and sabre.",
     prog="./test",
@@ -444,14 +485,13 @@ def test(
 
 """
 TODO
-- Add simulation
-- Write to CSV file
 - Write out experiments file
-
 - Figure out what is wrong with init-map in TB-OLSQ2
 - Broken pipe error after timeout (OLSQ2)
 - Hack for SABRE timeouts
 - SABRE tries!
+- Why does Q-synth write out two times?
+- How to choose model / solver for qt?
 """
 
 print(
@@ -475,6 +515,15 @@ print("OUTPUT")
 
 if result == "TO":
     print("Timeout.")
+    output_csv(
+        args.tool,
+        args.cx_optimal,
+        args.swap_optimal,
+        args.ancillaries,
+        args.input,
+        args.platform,
+        "TO",
+    )
 else:
     solver_time, total_time, circuit, initial_mapping = result
 
@@ -527,6 +576,26 @@ else:
         print(f"CX-depth: {cx_depth}")
         print(f"Swap count: {swap_count}")
         print(f"Success rate: {success_rate:.03f}%")
+
+        result = (solver_time, total_time, depth, cx_depth, swap_count, success_rate)
+        output_csv(
+            args.tool,
+            args.cx_optimal,
+            args.swap_optimal,
+            args.ancillaries,
+            args.input,
+            args.platform,
+            result,
+        )
     else:
         print("  ✗ Input and output circuits are not equivalent!")
         print("ERROR.")
+        output_csv(
+            args.tool,
+            args.cx_optimal,
+            args.swap_optimal,
+            args.ancillaries,
+            args.input,
+            args.platform,
+            "ERROR",
+        )

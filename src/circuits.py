@@ -550,3 +550,16 @@ def reinsert_unary_gates(
                     mapping[second_logical] = tmp
 
     return result_circuit
+
+def remove_all_non_swap_gates(circuit: QuantumCircuit) -> QuantumCircuit:
+    """
+    Remove all non-SWAP gates from the circuit.
+    """
+    num_qubits = circuit.num_qubits
+    qubit_name = circuit.qregs[0].name
+    new_circuit = QuantumCircuit(QuantumRegister(num_qubits, qubit_name))
+    for instr in circuit.data:
+        if instr[0].name.startswith("swap"):
+            new_circuit.append(instr[0], instr[1])
+
+    return new_circuit

@@ -12,6 +12,7 @@ from qiskit.transpiler.passes import SabreLayout
 from qiskit.transpiler import CouplingMap, Layout
 from qiskit.converters import circuit_to_dag, dag_to_circuit
 from itertools import takewhile
+from check import check_qcec, connectivity_check, equality_check
 from circuits import (
     LogicalQubit,
     PhysicalQubit,
@@ -29,6 +30,7 @@ from time_limit import TimeoutException, enforce_time_limit
 DEFAULT_TIME_LIMIT_S = 600
 TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
 
+
 def run(command: str, path: str):
     """
     Run a command in a given path.
@@ -39,10 +41,10 @@ def run(command: str, path: str):
         f'/bin/bash -c "{command_string}"', shell=True
     ).decode("utf-8")
 
+
 def put_in_queue(queue: Queue, command: str, path: str):
-    queue.put(
-        run(command, path)
-    )
+    queue.put(run(command, path))
+
 
 parser = argparse.ArgumentParser(
     description="A tool for testing and comparing qt, q-synth, olsq2, tb-olsq2 and sabre.",
@@ -148,7 +150,9 @@ def test(
                 match swap_optimal:
                     case True:
                         solver_time_line = list(
-                            filter(lambda line: line.startswith("Total solver time"), lines)
+                            filter(
+                                lambda line: line.startswith("Total solver time"), lines
+                            )
                         )[0]
                     case False:
                         solver_time_line = list(
@@ -176,7 +180,7 @@ def test(
             if not swap_optimal:
                 raise ValueError("Q-Synth is always SWAP-optimal.")
 
-            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {"rigetti-80" if platform == "rigetti80" else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
+            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {'rigetti-80' if platform == 'rigetti80' else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
             queue = Queue()
             p = Process(target=put_in_queue, args=(queue, command, "Q-Synth"))
             try:
@@ -195,6 +199,7 @@ def test(
                 return "TO"
 
             lines = output.split("\n")
+            print(output)
 
             start_time_line = list(
                 filter(lambda line: line.startswith("Start time: "), lines)
@@ -212,6 +217,18 @@ def test(
             )[0]
             total_time = float(solver_time_line.split(": ")[1])
 
+            initial_mapping_lines: list[str] = list(
+                filter(lambda line: line.startswith("...initially mapping"), lines)
+            )
+            raw_initial_mapping = [
+                (line.split(" ")[2], line.split(" ")[4])
+                for line in initial_mapping_lines
+            ]
+            initial_mapping = {
+                LogicalQubit(int(raw[0][1:])): PhysicalQubit(int(raw[1][1:]))
+                for raw in raw_initial_mapping
+            }
+
             # remove measurements from output file
             with open("tmp/output.qasm", "r") as f:
                 lines = f.readlines()
@@ -222,21 +239,8 @@ def test(
                     if not measure_line and not barrier_line:
                         f.write(line)
 
-            initial_mapping_lines = list(
-                filter(lambda line: line.startswith("...initially mapping"), lines)
-            )
-            raw_initial_mapping = [
-                (parts[2], parts[4])
-                for initial_mapping_line in initial_mapping_lines
-                for parts in initial_mapping_line.split(" ")
-            ]
-            initial_mapping = {
-                LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
-                for raw in raw_initial_mapping
-            }
-
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            #TODO: hvorfor total_time to gange???
+            # TODO: hvorfor total_time to gange???
             return total_time, total_time, circuit, initial_mapping
         case "olsq2":
             if not ancillaries:
@@ -397,7 +401,9 @@ def test(
                 raise ValueError("SABRE always uses ancillary SWAPs.")
             coupling_map = PLATFORMS[platform][1]
             circuit = QuantumCircuit.from_qasm_file(input)
-            sabre = SabreLayout(CouplingMap(coupling_map), swap_trials=100, layout_trials=100)
+            sabre = SabreLayout(
+                CouplingMap(coupling_map), swap_trials=100, layout_trials=100
+            )
             dag = circuit_to_dag(circuit)
 
             before = time.time()
@@ -444,7 +450,6 @@ TODO
 
 - Figure out what is wrong with init-map in TB-OLSQ2
 - Broken pipe error after timeout (OLSQ2)
-- Q-synth timeouts don't work (wait for Irfansha)
 - Hack for SABRE timeouts
 - SABRE tries!
 """
@@ -475,12 +480,38 @@ else:
 
     depth, cx_depth, swap_count = get_stats(circuit)
 
-    
-    if solver_time is not None:
-        print(f"Solver time: {solver_time:.03f}s")
+    input_circuit = QuantumCircuit.from_qasm_file(args.input)
+
+    platform_data = PLATFORMS[args.platform]
+    num_qubits = platform_data[0]
+    coupling_map = platform_data[1]
+    bidirectional_map = [
+        [connection[0], connection[1]] for connection in coupling_map
+    ] + [[connection[1], connection[0]] for connection in coupling_map]
+    correct_connectivity = connectivity_check(circuit, (num_qubits, bidirectional_map))
+    correct_output = equality_check(
+        input_circuit,
+        circuit,
+        initial_mapping,
+        args.ancillaries,
+    )
+    correct_qcec = check_qcec(
+        input_circuit.copy(),
+        circuit,
+        initial_mapping,
+        args.ancillaries,
+    )
+
+    if correct_connectivity and correct_output and correct_qcec:
+        print("  ✓ Input and output circuits are equivalent.")
+        if solver_time is not None:
+            print(f"Solver time: {solver_time:.03f}s")
+        else:
+            print("Solver time: N/A")
+        print(f"Total time: {total_time:.03f}s")
+        print(f"Depth: {depth}")
+        print(f"CX-depth: {cx_depth}")
+        print(f"Swap count: {swap_count}")
     else:
-        print("Solver time: N/A")
-    print(f"Total time: {total_time:.03f}s")
-    print(f"Depth: {depth}")
-    print(f"CX-depth: {cx_depth}")
-    print(f"Swap count: {swap_count}")
+        print("  ✗ Input and output circuits are not equivalent!")
+        print("ERROR.")

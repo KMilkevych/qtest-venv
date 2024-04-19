@@ -177,8 +177,22 @@ def test(
                 raise ValueError("Q-Synth is always SWAP-optimal.")
 
             command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {"rigetti-80" if platform == "rigetti80" else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
-            output = run(command, "Q-Synth")
-            # TODO: wait for Irfansha to answer about timeouts
+            queue = Queue()
+            p = Process(target=put_in_queue, args=(queue, command, "Q-Synth"))
+            try:
+                with enforce_time_limit(time_limit):
+                    p.start()
+
+                    # hack since p.join hangs
+                    while queue.empty():
+                        time.sleep(0.2)
+
+                    output = queue.get()
+                    queue.close()
+            except TimeoutException:
+                p.kill()
+                queue.close()
+                return "TO"
 
             lines = output.split("\n")
 
@@ -423,7 +437,6 @@ def test(
 
 """
 TODO
-- What to do with timeouts
 - Add validation
 - Add simulation
 - Write to CSV file

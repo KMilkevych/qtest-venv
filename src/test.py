@@ -16,6 +16,9 @@ from circuits import (
     get_stats,
     parse_olsq2_circuit,
     InitialMapping,
+    reinsert_unary_gates,
+    remove_all_non_cx_gates,
+    save_circuit,
 )
 
 
@@ -63,6 +66,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "-anc",
+    "--ancillaries",
+    help=f"whether to allow ancillary SWAPs or not",
+    action="store_true",
+)
+
+parser.add_argument(
     "tool",
     type=str,
     help=f"the tool to use, one of {', '.join(TOOLS)}",
@@ -90,12 +100,13 @@ def test(
     time_limit: int,
     cx_optimal: bool,
     swap_optimal: bool,
+    ancillaries: bool
 ) -> tuple[float | None, float, QuantumCircuit, InitialMapping]:
     """
     Run a tool on an input file on a platform with a time limit.
 
     Args:
-        - `tool` (str): the tool to use, one of {", ".join(TOOLS)}.
+        - `tool` (str): the tool to use, one of qt, olsq2, tb-olsq2, q-synth and sabre.
         - `input` (str): the path to the input file.
         - `platform` (str): the platform to run on.
         - `time_limit` (int): the time limit in seconds.
@@ -121,7 +132,7 @@ def test(
 
     match tool:
         case "qt":
-            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} -anc -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
+            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
             output = run(command, "qt")
 
             lines = output.split("\n")
@@ -151,12 +162,12 @@ def test(
             }
             return total_time, total_time, circuit, initial_mapping
         case "q-synth":
-            if cx_optimal:
-                raise ValueError("CX-optimal is not supported by q-synth.")
+            if not cx_optimal:
+                raise ValueError("Q-Synth always looks at CX-only circuits.")
             if not swap_optimal:
-                raise ValueError("Swap-optimal must be enabled for q-synth.")
+                raise ValueError("Q-Synth is always SWAP-optimal.")
 
-            command = f"poetry run python q-synth.py -b1 -a1 -m sat -s cd153 -p {platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
+            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
             output = run(command, "Q-Synth")
 
             lines = output.split("\n")
@@ -203,9 +214,17 @@ def test(
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
             return total_time, total_time, circuit, initial_mapping
         case "olsq2":
+            if not ancillaries:
+                raise ValueError("OLSQ2 always uses ancillary SWAPs.")
             if cx_optimal:
-                raise ValueError("CX-optimal is not supported by OLSQ2.")
-            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
+                input_circuit = QuantumCircuit.from_qasm_file(input)
+                only_cx_circuit = remove_all_non_cx_gates(input_circuit)
+                save_circuit(only_cx_circuit, "tmp/tmp_circuit.qasm")
+                circuit_path = "tmp/tmp_circuit.qasm"
+            else:
+                circuit_path = input
+
+            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
             output = run(command, "OLSQ2")
 
             lines = output.split("\n")
@@ -241,16 +260,28 @@ def test(
             )
             gate_lines = gate_lines[:stop_index]
 
-            input_name = input.split("/")[-1].split(".")[0]
+            input_name = circuit_path.split("/")[-1].split(".")[0]
             platform_depth = PLATFORMS[platform]
             circuit, initial_mapping = parse_olsq2_circuit(
                 f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
             )
-            return None, total_time, circuit, initial_mapping
+            if cx_optimal:
+                result_circuit = reinsert_unary_gates(input_circuit, circuit, initial_mapping, ancillaries=True)
+            else:
+                result_circuit = circuit
+
+            return None, total_time, result_circuit, initial_mapping
         case "tb-olsq2":
+            if not ancillaries:
+                raise ValueError("TB-OLSQ2 always uses ancillary SWAPs.")
             if cx_optimal:
-                raise ValueError("CX-optimal is not supported by OLSQ2.")
-            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{input} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
+                input_circuit = QuantumCircuit.from_qasm_file(input)
+                only_cx_circuit = remove_all_non_cx_gates(input_circuit)
+                save_circuit(only_cx_circuit, "tmp/tmp_circuit.qasm")
+                circuit_path = "tmp/tmp_circuit.qasm"
+            else:
+                circuit_path = input
+            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
             output = run(command, "OLSQ2")
 
             lines = output.split("\n")
@@ -286,13 +317,25 @@ def test(
             )
             gate_lines = gate_lines[:stop_index]
 
-            input_name = input.split("/")[-1].split(".")[0]
+            input_name = circuit_path.split("/")[-1].split(".")[0]
             platform_depth = PLATFORMS[platform]
             circuit, initial_mapping = parse_olsq2_circuit(
                 f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
             )
-            return None, total_time, circuit, initial_mapping
+            if cx_optimal:
+                # TODO: something is wrong with the initial mapping that tb-olsq2 gives out
+                result_circuit = reinsert_unary_gates(input_circuit, circuit, initial_mapping, ancillaries=True)
+            else:
+                result_circuit = circuit
+
+            return None, total_time, result_circuit, initial_mapping
         case "sabre":
+            if not cx_optimal:
+                raise ValueError("SABRE always looks at CX-only circuits.")
+            if not swap_optimal:
+                raise ValueError("SABRE always tries to optimize SWAPs.")
+            if not ancillaries:
+                raise ValueError("SABRE always uses ancillary SWAPs.")
             melbourne_coupling_map = [
                 [1, 0],
                 [1, 2],
@@ -339,7 +382,9 @@ def test(
                         if q._register.name == "q":
                             initial_mapping[LogicalQubit(q._index)] = PhysicalQubit(p)
                     else:
-                        raise ValueError(f"Something is wrong in SABRE's initial mapping:\n{sabre_layout}")
+                        raise ValueError(
+                            f"Something is wrong in SABRE's initial mapping:\n{sabre_layout}"
+                        )
             else:
                 raise ValueError(f"SABRE did not produce an initial mapping")
 
@@ -350,12 +395,13 @@ def test(
 
 """
 TODO
-- Enable CX-optimal for OLSQ2
-- Q-Synth should always be CX-optimal
-- Add qt_no_anc tool or ancilaries flag
+- Platforms
 - What to do with timeouts
 - Add validation
 - Add simulation
+- Write to CSV file
+- Write out experiments file
+- Figure out what is wrong with init-map in TB-OLSQ2
 """
 
 print(
@@ -363,6 +409,7 @@ print(
 )
 print(f"  CX-optimal: {args.cx_optimal}")
 print(f"  Swap-optimal: {args.swap_optimal}")
+print(f"  Ancillary SWAPs: {args.ancillaries}")
 solver_time, total_time, circuit, initial_mapping = test(
     args.tool,
     args.input,
@@ -370,6 +417,7 @@ solver_time, total_time, circuit, initial_mapping = test(
     args.time_limit,
     args.cx_optimal,
     args.swap_optimal,
+    args.ancillaries
 )
 
 depth, cx_depth, swap_count = get_stats(circuit)

@@ -20,11 +20,12 @@ from circuits import (
     remove_all_non_cx_gates,
     save_circuit,
 )
+from platforms import PLATFORMS
 
 
 DEFAULT_TIME_LIMIT_S = 600
 TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
-PLATFORMS = {"melbourne": 14}
+
 
 
 def run(command: str, path: str):
@@ -100,7 +101,7 @@ def test(
     time_limit: int,
     cx_optimal: bool,
     swap_optimal: bool,
-    ancillaries: bool
+    ancillaries: bool,
 ) -> tuple[float | None, float, QuantumCircuit, InitialMapping]:
     """
     Run a tool on an input file on a platform with a time limit.
@@ -108,7 +109,7 @@ def test(
     Args:
         - `tool` (str): the tool to use, one of qt, olsq2, tb-olsq2, q-synth and sabre.
         - `input` (str): the path to the input file.
-        - `platform` (str): the platform to run on.
+        - `platform` (str): the platform to run on, one of tenerife, melbourne, tokyo, sycamore, rigetti80, eagle.
         - `time_limit` (int): the time limit in seconds.
         - `cx_optimal` (bool): whether to optimize for cx-depth.
         - `swap_optimal` (bool): whether to optimize for swap count after finding a depth-optimal circuit.
@@ -167,7 +168,7 @@ def test(
             if not swap_optimal:
                 raise ValueError("Q-Synth is always SWAP-optimal.")
 
-            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
+            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {"rigetti-80" if platform == "rigetti80" else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
             output = run(command, "Q-Synth")
 
             lines = output.split("\n")
@@ -261,12 +262,14 @@ def test(
             gate_lines = gate_lines[:stop_index]
 
             input_name = circuit_path.split("/")[-1].split(".")[0]
-            platform_depth = PLATFORMS[platform]
+            platform_depth = PLATFORMS[platform][0]
             circuit, initial_mapping = parse_olsq2_circuit(
                 f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
             )
             if cx_optimal:
-                result_circuit = reinsert_unary_gates(input_circuit, circuit, initial_mapping, ancillaries=True)
+                result_circuit = reinsert_unary_gates(
+                    input_circuit, circuit, initial_mapping, ancillaries=True
+                )
             else:
                 result_circuit = circuit
 
@@ -318,13 +321,15 @@ def test(
             gate_lines = gate_lines[:stop_index]
 
             input_name = circuit_path.split("/")[-1].split(".")[0]
-            platform_depth = PLATFORMS[platform]
+            platform_depth = PLATFORMS[platform][0]
             circuit, initial_mapping = parse_olsq2_circuit(
                 f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
             )
             if cx_optimal:
                 # TODO: something is wrong with the initial mapping that tb-olsq2 gives out
-                result_circuit = reinsert_unary_gates(input_circuit, circuit, initial_mapping, ancillaries=True)
+                result_circuit = reinsert_unary_gates(
+                    input_circuit, circuit, initial_mapping, ancillaries=True
+                )
             else:
                 result_circuit = circuit
 
@@ -336,28 +341,9 @@ def test(
                 raise ValueError("SABRE always tries to optimize SWAPs.")
             if not ancillaries:
                 raise ValueError("SABRE always uses ancillary SWAPs.")
-            melbourne_coupling_map = [
-                [1, 0],
-                [1, 2],
-                [2, 3],
-                [4, 3],
-                [4, 10],
-                [5, 4],
-                [5, 6],
-                [5, 9],
-                [6, 8],
-                [7, 8],
-                [9, 8],
-                [9, 10],
-                [11, 3],
-                [11, 10],
-                [11, 12],
-                [12, 2],
-                [13, 1],
-                [13, 12],
-            ]
+            coupling_map = PLATFORMS[platform][1]
             circuit = QuantumCircuit.from_qasm_file(input)
-            sabre = SabreLayout(CouplingMap(melbourne_coupling_map))
+            sabre = SabreLayout(CouplingMap(coupling_map))
             dag = circuit_to_dag(circuit)
 
             before = time.time()
@@ -395,13 +381,13 @@ def test(
 
 """
 TODO
-- Platforms
 - What to do with timeouts
 - Add validation
 - Add simulation
 - Write to CSV file
 - Write out experiments file
 - Figure out what is wrong with init-map in TB-OLSQ2
+- SABRE tries!
 """
 
 print(
@@ -417,7 +403,7 @@ solver_time, total_time, circuit, initial_mapping = test(
     args.time_limit,
     args.cx_optimal,
     args.swap_optimal,
-    args.ancillaries
+    args.ancillaries,
 )
 
 depth, cx_depth, swap_count = get_stats(circuit)

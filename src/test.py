@@ -24,6 +24,7 @@ from circuits import (
     save_circuit,
 )
 from platforms import PLATFORMS
+from simulator import ACCEPTED_PLATFORMS, simulate
 from time_limit import TimeoutException, enforce_time_limit
 
 
@@ -443,7 +444,6 @@ def test(
 
 """
 TODO
-- Add validation
 - Add simulation
 - Write to CSV file
 - Write out experiments file
@@ -504,6 +504,20 @@ else:
 
     if correct_connectivity and correct_output and correct_qcec:
         print("  ✓ Input and output circuits are equivalent.")
+
+        success_rate = (
+            simulate(
+                input_circuit,
+                circuit,
+                initial_mapping,
+                args.platform,
+                10000,
+                args.ancillaries,
+            )
+            if args.platform in ACCEPTED_PLATFORMS
+            else None
+        )
+
         if solver_time is not None:
             print(f"Solver time: {solver_time:.03f}s")
         else:
@@ -512,6 +526,7 @@ else:
         print(f"Depth: {depth}")
         print(f"CX-depth: {cx_depth}")
         print(f"Swap count: {swap_count}")
+        print(f"Success rate: {success_rate:.03f}%")
     else:
         print("  ✗ Input and output circuits are not equivalent!")
         print("ERROR.")

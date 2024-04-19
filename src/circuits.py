@@ -534,7 +534,10 @@ def reinsert_unary_gates(
                     first not in reverse_mapping.keys()
                     or second not in reverse_mapping.keys()
                 ):
-                    if first not in reverse_mapping.keys() and second not in reverse_mapping.keys():
+                    if (
+                        first not in reverse_mapping.keys()
+                        and second not in reverse_mapping.keys()
+                    ):
                         pass
                     elif first not in reverse_mapping.keys():
                         second_logical = reverse_mapping[second]
@@ -551,6 +554,7 @@ def reinsert_unary_gates(
 
     return result_circuit
 
+
 def remove_all_non_swap_gates(circuit: QuantumCircuit) -> QuantumCircuit:
     """
     Remove all non-SWAP gates from the circuit.
@@ -563,3 +567,34 @@ def remove_all_non_swap_gates(circuit: QuantumCircuit) -> QuantumCircuit:
             new_circuit.append(instr[0], instr[1])
 
     return new_circuit
+
+
+def make_final_mapping(
+    circuit: QuantumCircuit,
+    initial_mapping: dict[LogicalQubit, PhysicalQubit],
+    ancillaries: bool,
+) -> dict[LogicalQubit, PhysicalQubit]:
+    reverse_mapping: dict[PhysicalQubit, LogicalQubit] = {
+        p: q for q, p in initial_mapping.items()
+    }
+    only_swaps_circuit = remove_all_non_swap_gates(circuit)
+    for instr in only_swaps_circuit.data:
+        physical1 = PhysicalQubit(instr[1][0]._index)
+        physical2 = PhysicalQubit(instr[1][1]._index)
+        if ancillaries and (
+            physical1 not in reverse_mapping.keys()
+            or physical2 not in reverse_mapping.keys()
+        ):
+            if physical1 not in reverse_mapping.keys():
+                reverse_mapping[physical1] = reverse_mapping[physical2]
+                del reverse_mapping[physical2]
+            else:
+                reverse_mapping[physical2] = reverse_mapping[physical1]
+                del reverse_mapping[physical1]
+        else:
+            tmp = reverse_mapping[physical1]
+            reverse_mapping[physical1] = reverse_mapping[physical2]
+            reverse_mapping[physical2] = tmp
+
+    final_mapping = {q: p for p, q in reverse_mapping.items()}
+    return final_mapping

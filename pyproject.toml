@@ -9,6 +9,8 @@ readme = "README.md"
 python = "^3.12"
 qiskit = "^1.0.2"
 mqt-qcec = "^2.5.0"
+qiskit-aer = "^0.14.0.1"
+qiskit-ibm-runtime = "^0.23.0"
 
 
 [build-system]

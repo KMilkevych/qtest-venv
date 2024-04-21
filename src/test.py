@@ -168,6 +168,8 @@ def test(
         raise ValueError(f"Unknown tool: '{tool}'.")
     if platform not in PLATFORMS.keys():
         raise ValueError(f"Unknown platform: '{platform}'.")
+    if not os.path.exists(input):
+        raise ValueError(f"Input file '{input}' does not exist.")
 
     os.makedirs("tmp", exist_ok=True)
     with open("tmp/output.txt", "w") as f:

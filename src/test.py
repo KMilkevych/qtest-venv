@@ -1,7 +1,6 @@
 import os
 import subprocess
 import argparse
-import datetime
 import time
 from typing import Literal
 
@@ -224,7 +223,6 @@ def test(
                 return "TO"
 
             lines = output.split("\n")
-            print(output)
 
             total_time_line = list(
                 filter(lambda line: line.startswith("Encoding time: "), lines)

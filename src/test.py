@@ -1,4 +1,3 @@
-from multiprocessing import Queue, Process
 import os
 import subprocess
 import argparse
@@ -25,26 +24,21 @@ from circuits import (
 )
 from platforms import PLATFORMS
 from simulator import ACCEPTED_PLATFORMS, simulate
-from time_limit import TimeoutException, enforce_time_limit
 
 
 DEFAULT_TIME_LIMIT_S = 600
 TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
 
 
-def run(command: str, path: str):
+def run(command: str, path: str, time_limit: int):
     """
     Run a command in a given path.
     """
     print(f"Running '{command}' in '{path}'")
     command_string = f"cd {path}; source .venv/bin/activate; {command}"
     return subprocess.check_output(
-        f'/bin/bash -c "{command_string}"', shell=True
+        f'/bin/bash -c "{command_string}"', shell=True, timeout=time_limit
     ).decode("utf-8")
-
-
-def put_in_queue(queue: Queue, command: str, path: str):
-    queue.put(run(command, path))
 
 
 CSV_OUTPUT_FILE = "tmp/output.csv"
@@ -183,39 +177,40 @@ def test(
     match tool:
         case "qt":
             command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
-            output = run(command, "qt")
+            try:
+                output = run(command, "qt", time_limit)
+            except subprocess.TimeoutExpired:
+                return "TO"
 
             lines = output.split("\n")
             if lines[-3].endswith("Timeout."):
                 return "TO"
-            else:
-                match swap_optimal:
-                    case True:
-                        solver_time_line = list(
-                            filter(
-                                lambda line: line.startswith("Total solver time"), lines
-                            )
-                        )[0]
-                    case False:
-                        solver_time_line = list(
-                            filter(lambda line: line.startswith("Solver time"), lines)
-                        )[0]
-                total_time_line = list(
-                    filter(lambda line: line.startswith("Total time"), lines)
-                )[0]
 
-                total_time = float(solver_time_line.split(": ")[1].split(" ")[0])
-                total_time = float(total_time_line.split(": ")[1].split(" ")[0])
+            match swap_optimal:
+                case True:
+                    total_time_line = list(
+                        filter(lambda line: line.startswith("Total solver time"), lines)
+                    )[0]
+                case False:
+                    total_time_line = list(
+                        filter(lambda line: line.startswith("Solver time"), lines)
+                    )[0]
+            total_time_line = list(
+                filter(lambda line: line.startswith("Total time"), lines)
+            )[0]
 
-                circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-                with open("tmp/initial_mapping.txt", "r") as f:
-                    lines = f.readlines()
-                raw_initial_mapping = [line.split(" -> ") for line in lines]
-                initial_mapping = {
-                    LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
-                    for raw in raw_initial_mapping
-                }
-                return total_time, total_time, circuit, initial_mapping
+            total_time = float(total_time_line.split(": ")[1].split(" ")[0])
+            total_time = float(total_time_line.split(": ")[1].split(" ")[0])
+
+            circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
+            with open("tmp/initial_mapping.txt", "r") as f:
+                lines = f.readlines()
+            raw_initial_mapping = [line.split(" -> ") for line in lines]
+            initial_mapping = {
+                LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
+                for raw in raw_initial_mapping
+            }
+            return total_time, total_time, circuit, initial_mapping
         case "q-synth":
             if not cx_optimal:
                 raise ValueError("Q-Synth always looks at CX-only circuits.")
@@ -223,41 +218,18 @@ def test(
                 raise ValueError("Q-Synth is always SWAP-optimal.")
 
             command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {'rigetti-80' if platform == 'rigetti80' else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
-            queue = Queue()
-            p = Process(target=put_in_queue, args=(queue, command, "Q-Synth"))
             try:
-                with enforce_time_limit(time_limit):
-                    p.start()
-
-                    # hack since p.join hangs
-                    while queue.empty():
-                        time.sleep(0.2)
-
-                    output = queue.get()
-                    queue.close()
-            except TimeoutException:
-                p.kill()
-                queue.close()
+                output = run(command, "Q-Synth", time_limit)
+            except subprocess.TimeoutExpired:
                 return "TO"
 
             lines = output.split("\n")
             print(output)
 
-            start_time_line = list(
-                filter(lambda line: line.startswith("Start time: "), lines)
-            )[0]
-            finish_time_line = list(
-                filter(lambda line: line.startswith("Finish time: "), lines)
-            )[0]
-            start_time = datetime.datetime.fromisoformat(start_time_line.split(": ")[1])
-            finish_time = datetime.datetime.fromisoformat(
-                finish_time_line.split(": ")[1]
-            )
-            total_time = (finish_time - start_time).total_seconds()
-            solver_time_line = list(
+            total_time_line = list(
                 filter(lambda line: line.startswith("Encoding time: "), lines)
             )[0]
-            total_time = float(solver_time_line.split(": ")[1])
+            total_time = float(total_time_line.split(": ")[1])
 
             initial_mapping_lines: list[str] = list(
                 filter(lambda line: line.startswith("...initially mapping"), lines)
@@ -282,8 +254,8 @@ def test(
                         f.write(line)
 
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            # TODO: hvorfor total_time to gange???
-            return total_time, total_time, circuit, initial_mapping
+
+            return None, total_time, circuit, initial_mapping
         case "olsq2":
             if not ancillaries:
                 raise ValueError("OLSQ2 always uses ancillary SWAPs.")
@@ -296,21 +268,10 @@ def test(
                 circuit_path = input
 
             command = f"poetry run python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
-            queue = Queue()
-            p = Process(target=put_in_queue, args=(queue, command, "OLSQ2"))
+
             try:
-                with enforce_time_limit(time_limit):
-                    p.start()
-
-                    # hack since p.join hangs
-                    while queue.empty():
-                        time.sleep(0.2)
-
-                    output = queue.get()
-                    queue.close()
-            except TimeoutException:
-                p.kill()
-                queue.close()
+                output = run(command, "OLSQ2", time_limit)
+            except subprocess.TimeoutExpired:
                 return "TO"
 
             lines = output.split("\n")
@@ -325,6 +286,7 @@ def test(
                     lines,
                 )
             )
+
             # OLSQ2 outputs gates many times.
             # We want the final gate list.
             # We reverse the list so these gates appear at the beginning.
@@ -370,21 +332,10 @@ def test(
             else:
                 circuit_path = input
             command = f"poetry run python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
-            queue = Queue()
-            p = Process(target=put_in_queue, args=(queue, command, "OLSQ2"))
+
             try:
-                with enforce_time_limit(time_limit):
-                    p.start()
-
-                    # hack since p.join hangs
-                    while queue.empty():
-                        time.sleep(0.2)
-
-                    output = queue.get()
-                    queue.close()
-            except TimeoutException:
-                p.kill()
-                queue.close()
+                output = run(command, "OLSQ2", time_limit)
+            except subprocess.TimeoutExpired:
                 return "TO"
 
             lines = output.split("\n")

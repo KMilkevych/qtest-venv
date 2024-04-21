@@ -36,7 +36,7 @@ def run(command: str, path: str, time_limit: int):
     print(f"Running '{command}' in '{path}'")
     command_string = f"cd {path}; source .venv/bin/activate; {command}"
     return subprocess.check_output(
-        f'/bin/bash -c "{command_string}"', shell=True, timeout=time_limit
+        f'/bin/bash -c "{command_string} 2> /dev/null"', shell=True, timeout=time_limit
     ).decode("utf-8")
 
 
@@ -216,7 +216,7 @@ def test(
             if not swap_optimal:
                 raise ValueError("Q-Synth is always SWAP-optimal.")
 
-            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {'rigetti-80' if platform == 'rigetti80' else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit} 2> /dev/null"
+            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {'rigetti-80' if platform == 'rigetti80' else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit}"
             try:
                 output = run(command, "Q-Synth", time_limit)
             except subprocess.TimeoutExpired:
@@ -434,14 +434,12 @@ def test(
 
 """
 TODO
-# Definitely
 - Fix simulations
   - Try "./test {qt, olsq2, q-synth} qt/benchmarks/adder.qasm melbourne -swap -cx -anc"
-  
+
 - Write out experiments file
 - Figure out what is wrong with init-map in TB-OLSQ2
 - Broken pipe error after timeout (OLSQ2)
-- Hack for SABRE timeouts
 - SABRE tries!
 
 
@@ -450,6 +448,8 @@ TODO
   - Some legacy from when I was trying things - I cleaned up the code
 - How to choose model / solver for qt?
   - I added two different versions of qt
+- Hack for SABRE timeouts
+  - Fine, it will never be a problem
 
 
 

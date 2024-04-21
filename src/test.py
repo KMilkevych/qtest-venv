@@ -26,7 +26,7 @@ from simulator import ACCEPTED_PLATFORMS, simulate
 
 
 DEFAULT_TIME_LIMIT_S = 600
-TOOLS = ["qt", "q-synth", "olsq2", "tb-olsq2", "sabre"]
+TOOLS = ["qt-gl", "qt-cd", "q-synth", "olsq2", "tb-olsq2", "sabre"]
 
 
 def run(command: str, path: str, time_limit: int):
@@ -174,8 +174,8 @@ def test(
         f.write("")
 
     match tool:
-        case "qt":
-            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s glucose42 {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
+        case tool if tool in ["qt-gl", "qt-cd"]:
+            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s {"glucose42" if tool == "qt-gl" else "cadical153"} {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
             try:
                 output = run(command, "qt", time_limit)
             except subprocess.TimeoutExpired:
@@ -434,13 +434,25 @@ def test(
 
 """
 TODO
+# Definitely
+- Fix simulations
+  - Try "./test {qt, olsq2, q-synth} qt/benchmarks/adder.qasm melbourne -swap -cx -anc"
+  
 - Write out experiments file
 - Figure out what is wrong with init-map in TB-OLSQ2
 - Broken pipe error after timeout (OLSQ2)
 - Hack for SABRE timeouts
 - SABRE tries!
+
+
+# I think fixed?
 - Why does Q-synth write out two times?
+  - Some legacy from when I was trying things - I cleaned up the code
 - How to choose model / solver for qt?
+  - I added two different versions of qt
+
+
+
 """
 
 print(

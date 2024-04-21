@@ -144,7 +144,7 @@ def test(
     cx_optimal: bool,
     swap_optimal: bool,
     ancillaries: bool,
-) -> tuple[float | None, float, QuantumCircuit, InitialMapping] | Literal["TO"]:
+) -> tuple[float | None, float, QuantumCircuit, InitialMapping] | Literal["TO"] | Literal["ERR"]:
     """
     Run a tool on an input file on a platform with a time limit.
 
@@ -180,36 +180,40 @@ def test(
                 output = run(command, "qt", time_limit)
             except subprocess.TimeoutExpired:
                 return "TO"
+            
+            try:
+                lines = output.split("\n")
+                if lines[-3].endswith("Timeout."):
+                    return "TO"
 
-            lines = output.split("\n")
-            if lines[-3].endswith("Timeout."):
-                return "TO"
+                match swap_optimal:
+                    case True:
+                        total_time_line = list(
+                            filter(lambda line: line.startswith("Total solver time"), lines)
+                        )[0]
+                    case False:
+                        total_time_line = list(
+                            filter(lambda line: line.startswith("Solver time"), lines)
+                        )[0]
+                total_time_line = list(
+                    filter(lambda line: line.startswith("Total time"), lines)
+                )[0]
 
-            match swap_optimal:
-                case True:
-                    total_time_line = list(
-                        filter(lambda line: line.startswith("Total solver time"), lines)
-                    )[0]
-                case False:
-                    total_time_line = list(
-                        filter(lambda line: line.startswith("Solver time"), lines)
-                    )[0]
-            total_time_line = list(
-                filter(lambda line: line.startswith("Total time"), lines)
-            )[0]
+                total_time = float(total_time_line.split(": ")[1].split(" ")[0])
+                total_time = float(total_time_line.split(": ")[1].split(" ")[0])
 
-            total_time = float(total_time_line.split(": ")[1].split(" ")[0])
-            total_time = float(total_time_line.split(": ")[1].split(" ")[0])
-
-            circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            with open("tmp/initial_mapping.txt", "r") as f:
-                lines = f.readlines()
-            raw_initial_mapping = [line.split(" -> ") for line in lines]
-            initial_mapping = {
-                LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
-                for raw in raw_initial_mapping
-            }
-            return total_time, total_time, circuit, initial_mapping
+                circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
+                with open("tmp/initial_mapping.txt", "r") as f:
+                    lines = f.readlines()
+                raw_initial_mapping = [line.split(" -> ") for line in lines]
+                initial_mapping = {
+                    LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
+                    for raw in raw_initial_mapping
+                }
+                return total_time, total_time, circuit, initial_mapping
+            except Exception as e:
+                print(f"Error in parsing output: {e}")
+                return "ERR"
         case "q-synth":
             if not cx_optimal:
                 raise ValueError("Q-Synth always looks at CX-only circuits.")
@@ -222,37 +226,41 @@ def test(
             except subprocess.TimeoutExpired:
                 return "TO"
 
-            lines = output.split("\n")
+            try: 
+                lines = output.split("\n")
 
-            total_time_line = list(
-                filter(lambda line: line.startswith("Encoding time: "), lines)
-            )[0]
-            total_time = float(total_time_line.split(": ")[1])
+                total_time_line = list(
+                    filter(lambda line: line.startswith("Encoding time: "), lines)
+                )[0]
+                total_time = float(total_time_line.split(": ")[1])
 
-            initial_mapping_lines: list[str] = list(
-                filter(lambda line: line.startswith("...initially mapping"), lines)
-            )
-            raw_initial_mapping = [
-                (line.split(" ")[2], line.split(" ")[4])
-                for line in initial_mapping_lines
-            ]
-            initial_mapping = {
-                LogicalQubit(int(raw[0][1:])): PhysicalQubit(int(raw[1][1:]))
-                for raw in raw_initial_mapping
-            }
+                initial_mapping_lines: list[str] = list(
+                    filter(lambda line: line.startswith("...initially mapping"), lines)
+                )
+                raw_initial_mapping = [
+                    (line.split(" ")[2], line.split(" ")[4])
+                    for line in initial_mapping_lines
+                ]
+                initial_mapping = {
+                    LogicalQubit(int(raw[0][1:])): PhysicalQubit(int(raw[1][1:]))
+                    for raw in raw_initial_mapping
+                }
 
-            # remove measurements from output file
-            with open("tmp/output.qasm", "r") as f:
-                lines = f.readlines()
-            with open("tmp/output.qasm", "w") as f:
-                for line in lines:
-                    measure_line = line.startswith("measure")
-                    barrier_line = line.startswith("barrier")
-                    if not measure_line and not barrier_line:
-                        f.write(line)
+                # remove measurements from output file
+                with open("tmp/output.qasm", "r") as f:
+                    lines = f.readlines()
+                with open("tmp/output.qasm", "w") as f:
+                    for line in lines:
+                        measure_line = line.startswith("measure")
+                        barrier_line = line.startswith("barrier")
+                        if not measure_line and not barrier_line:
+                            f.write(line)
 
-            circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-            return None, total_time, circuit, initial_mapping
+                circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
+                return None, total_time, circuit, initial_mapping
+            except Exception as e:
+                print(f"Error in parsing output: {e}")
+                return "ERR"
         case "olsq2":
             if not ancillaries:
                 raise ValueError("OLSQ2 always uses ancillary SWAPs.")
@@ -271,53 +279,57 @@ def test(
             except subprocess.TimeoutExpired:
                 return "TO"
 
-            lines = output.split("\n")
-            total_time_line = list(
-                filter(lambda line: line.startswith("Total compilation time"), lines)
-            )[0]
-            total_time = float(total_time_line.split(" = ")[1][:-1])
+            try:
+                lines = output.split("\n")
+                total_time_line = list(
+                    filter(lambda line: line.startswith("Total compilation time"), lines)
+                )[0]
+                total_time = float(total_time_line.split(" = ")[1][:-1])
 
-            gate_lines = list(
-                filter(
-                    lambda line: line.startswith("SWAP") or line.startswith("Gate"),
-                    lines,
-                )
-            )
-
-            # OLSQ2 outputs gates many times.
-            # We want the final gate list.
-            # We reverse the list so these gates appear at the beginning.
-            gate_lines.reverse()
-            gate_0_index = gate_lines.index(
-                list(filter(lambda line: line.startswith("Gate 0"), gate_lines))[0]
-            )
-            stop_index = (
-                gate_0_index
-                + len(
-                    list(
-                        takewhile(
-                            lambda s: s.startswith("SWAP"),
-                            gate_lines[gate_0_index + 1 :],
-                        )
+                gate_lines = list(
+                    filter(
+                        lambda line: line.startswith("SWAP") or line.startswith("Gate"),
+                        lines,
                     )
                 )
-                + 1
-            )
-            gate_lines = gate_lines[:stop_index]
 
-            input_name = circuit_path.split("/")[-1].split(".")[0]
-            platform_depth = PLATFORMS[platform][0]
-            circuit, initial_mapping = parse_olsq2_circuit(
-                f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
-            )
-            if cx_optimal:
-                result_circuit = reinsert_unary_gates(
-                    input_circuit, circuit, initial_mapping, ancillaries=True
+                # OLSQ2 outputs gates many times.
+                # We want the final gate list.
+                # We reverse the list so these gates appear at the beginning.
+                gate_lines.reverse()
+                gate_0_index = gate_lines.index(
+                    list(filter(lambda line: line.startswith("Gate 0"), gate_lines))[0]
                 )
-            else:
-                result_circuit = circuit
+                stop_index = (
+                    gate_0_index
+                    + len(
+                        list(
+                            takewhile(
+                                lambda s: s.startswith("SWAP"),
+                                gate_lines[gate_0_index + 1 :],
+                            )
+                        )
+                    )
+                    + 1
+                )
+                gate_lines = gate_lines[:stop_index]
 
-            return None, total_time, result_circuit, initial_mapping
+                input_name = circuit_path.split("/")[-1].split(".")[0]
+                platform_depth = PLATFORMS[platform][0]
+                circuit, initial_mapping = parse_olsq2_circuit(
+                    f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
+                )
+                if cx_optimal:
+                    result_circuit = reinsert_unary_gates(
+                        input_circuit, circuit, initial_mapping, ancillaries=True
+                    )
+                else:
+                    result_circuit = circuit
+
+                return None, total_time, result_circuit, initial_mapping
+            except Exception as e:
+                print(f"Error in parsing output: {e}")
+                return "ERR"
         case "tb-olsq2":
             if not ancillaries:
                 raise ValueError("TB-OLSQ2 always uses ancillary SWAPs.")
@@ -335,54 +347,58 @@ def test(
             except subprocess.TimeoutExpired:
                 return "TO"
 
-            lines = output.split("\n")
-            total_time_line = list(
-                filter(lambda line: line.startswith("Total compilation time"), lines)
-            )[0]
-            total_time = float(total_time_line.split(" = ")[1][:-1])
+            try:
+                lines = output.split("\n")
+                total_time_line = list(
+                    filter(lambda line: line.startswith("Total compilation time"), lines)
+                )[0]
+                total_time = float(total_time_line.split(" = ")[1][:-1])
 
-            gate_lines = list(
-                filter(
-                    lambda line: line.startswith("SWAP") or line.startswith("Gate"),
-                    lines,
-                )
-            )
-
-            # OLSQ2 outputs gates many times.
-            # We want the final gate list.
-            # We reverse the list so these gates appear at the beginning.
-            gate_lines.reverse()
-            gate_0_index = gate_lines.index(
-                list(filter(lambda line: line.startswith("Gate 0"), gate_lines))[0]
-            )
-            stop_index = (
-                gate_0_index
-                + len(
-                    list(
-                        takewhile(
-                            lambda s: s.startswith("SWAP"),
-                            gate_lines[gate_0_index + 1 :],
-                        )
+                gate_lines = list(
+                    filter(
+                        lambda line: line.startswith("SWAP") or line.startswith("Gate"),
+                        lines,
                     )
                 )
-                + 1
-            )
-            gate_lines = gate_lines[:stop_index]
 
-            input_name = circuit_path.split("/")[-1].split(".")[0]
-            platform_depth = PLATFORMS[platform][0]
-            circuit, initial_mapping = parse_olsq2_circuit(
-                f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
-            )
-            if cx_optimal:
-                # TODO: something is wrong with the initial mapping that tb-olsq2 gives out
-                result_circuit = reinsert_unary_gates(
-                    input_circuit, circuit, initial_mapping, ancillaries=True
+                # OLSQ2 outputs gates many times.
+                # We want the final gate list.
+                # We reverse the list so these gates appear at the beginning.
+                gate_lines.reverse()
+                gate_0_index = gate_lines.index(
+                    list(filter(lambda line: line.startswith("Gate 0"), gate_lines))[0]
                 )
-            else:
-                result_circuit = circuit
+                stop_index = (
+                    gate_0_index
+                    + len(
+                        list(
+                            takewhile(
+                                lambda s: s.startswith("SWAP"),
+                                gate_lines[gate_0_index + 1 :],
+                            )
+                        )
+                    )
+                    + 1
+                )
+                gate_lines = gate_lines[:stop_index]
 
-            return None, total_time, result_circuit, initial_mapping
+                input_name = circuit_path.split("/")[-1].split(".")[0]
+                platform_depth = PLATFORMS[platform][0]
+                circuit, initial_mapping = parse_olsq2_circuit(
+                    f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
+                )
+                if cx_optimal:
+                    # TODO: something is wrong with the initial mapping that tb-olsq2 gives out
+                    result_circuit = reinsert_unary_gates(
+                        input_circuit, circuit, initial_mapping, ancillaries=True
+                    )
+                else:
+                    result_circuit = circuit
+
+                return None, total_time, result_circuit, initial_mapping
+            except Exception as e:
+                print(f"Error in parsing output: {e}")
+                return "ERR"
         case "sabre":
             if not cx_optimal:
                 raise ValueError("SABRE always looks at CX-only circuits.")
@@ -439,7 +455,6 @@ TODO
 
 - Write out experiments file
 - Figure out what is wrong with init-map in TB-OLSQ2
-- Broken pipe error after timeout (OLSQ2)
 - SABRE tries!
 
 
@@ -450,9 +465,9 @@ TODO
   - I added two different versions of qt
 - Hack for SABRE timeouts
   - Fine, it will never be a problem
-
-
-
+- Broken pipe error after timeout (OLSQ2)
+  - Problem was that child process would die with an error and return it to the parent (our terminal)
+  - I fixed this by redirecting the error to /dev/null
 """
 
 print(
@@ -484,6 +499,19 @@ if result == "TO":
         args.input,
         args.platform,
         "TO",
+    )
+    exit(0)
+
+if result == "ERR":
+    print("Error.")
+    output_csv(
+        args.tool,
+        args.cx_optimal,
+        args.swap_optimal,
+        args.ancillaries,
+        args.input,
+        args.platform,
+        "ERROR",
     )
     exit(0)
 

@@ -252,7 +252,6 @@ def test(
                         f.write(line)
 
             circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
-
             return None, total_time, circuit, initial_mapping
         case "olsq2":
             if not ancillaries:
@@ -348,6 +347,7 @@ def test(
                     lines,
                 )
             )
+
             # OLSQ2 outputs gates many times.
             # We want the final gate list.
             # We reverse the list so these gates appear at the beginning.
@@ -473,78 +473,81 @@ if result == "TO":
         args.platform,
         "TO",
     )
-else:
-    solver_time, total_time, circuit, initial_mapping = result
+    exit(0)
 
-    depth, cx_depth, swap_count = get_stats(circuit)
+solver_time, total_time, circuit, initial_mapping = result
+depth, cx_depth, swap_count = get_stats(circuit)
 
-    input_circuit = QuantumCircuit.from_qasm_file(args.input)
+input_circuit = QuantumCircuit.from_qasm_file(args.input)
 
-    platform_data = PLATFORMS[args.platform]
-    num_qubits = platform_data[0]
-    coupling_map = platform_data[1]
-    bidirectional_map = [
-        [connection[0], connection[1]] for connection in coupling_map
-    ] + [[connection[1], connection[0]] for connection in coupling_map]
-    correct_connectivity = connectivity_check(circuit, (num_qubits, bidirectional_map))
-    correct_output = equality_check(
+platform_data = PLATFORMS[args.platform]
+num_qubits = platform_data[0]
+coupling_map = platform_data[1]
+bidirectional_map = [[connection[0], connection[1]] for connection in coupling_map] + [
+    [connection[1], connection[0]] for connection in coupling_map
+]
+correct_connectivity = connectivity_check(circuit, (num_qubits, bidirectional_map))
+correct_output = equality_check(
+    input_circuit,
+    circuit,
+    initial_mapping,
+    args.ancillaries,
+)
+correct_qcec = check_qcec(
+    input_circuit.copy(),
+    circuit,
+    initial_mapping,
+    args.ancillaries,
+)
+
+everything_correct = correct_connectivity and correct_output and correct_qcec
+
+if not everything_correct:
+    print("  ✗ Input and output circuits are not equivalent!")
+    print("ERROR.")
+    output_csv(
+        args.tool,
+        args.cx_optimal,
+        args.swap_optimal,
+        args.ancillaries,
+        args.input,
+        args.platform,
+        "ERROR",
+    )
+
+    exit(0)
+
+print("  ✓ Input and output circuits are equivalent.")
+success_rate = (
+    simulate(
         input_circuit,
         circuit,
         initial_mapping,
+        args.platform,
+        10000,
         args.ancillaries,
     )
-    correct_qcec = check_qcec(
-        input_circuit.copy(),
-        circuit,
-        initial_mapping,
-        args.ancillaries,
-    )
+    if args.platform in ACCEPTED_PLATFORMS
+    else None
+)
 
-    if correct_connectivity and correct_output and correct_qcec:
-        print("  ✓ Input and output circuits are equivalent.")
+if solver_time is not None:
+    print(f"Solver time: {solver_time:.03f}s")
+else:
+    print("Solver time: N/A")
+print(f"Total time: {total_time:.03f}s")
+print(f"Depth: {depth}")
+print(f"CX-depth: {cx_depth}")
+print(f"Swap count: {swap_count}")
+print(f"Success rate: {success_rate:.03f}%")
 
-        success_rate = (
-            simulate(
-                input_circuit,
-                circuit,
-                initial_mapping,
-                args.platform,
-                10000,
-                args.ancillaries,
-            )
-            if args.platform in ACCEPTED_PLATFORMS
-            else None
-        )
-
-        if solver_time is not None:
-            print(f"Solver time: {solver_time:.03f}s")
-        else:
-            print("Solver time: N/A")
-        print(f"Total time: {total_time:.03f}s")
-        print(f"Depth: {depth}")
-        print(f"CX-depth: {cx_depth}")
-        print(f"Swap count: {swap_count}")
-        print(f"Success rate: {success_rate:.03f}%")
-
-        result = (solver_time, total_time, depth, cx_depth, swap_count, success_rate)
-        output_csv(
-            args.tool,
-            args.cx_optimal,
-            args.swap_optimal,
-            args.ancillaries,
-            args.input,
-            args.platform,
-            result,
-        )
-    else:
-        print("  ✗ Input and output circuits are not equivalent!")
-        print("ERROR.")
-        output_csv(
-            args.tool,
-            args.cx_optimal,
-            args.swap_optimal,
-            args.ancillaries,
-            args.input,
-            args.platform,
-            "ERROR",
-        )
+result = (solver_time, total_time, depth, cx_depth, swap_count, success_rate)
+output_csv(
+    args.tool,
+    args.cx_optimal,
+    args.swap_optimal,
+    args.ancillaries,
+    args.input,
+    args.platform,
+    result,
+)

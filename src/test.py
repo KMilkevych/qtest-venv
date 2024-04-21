@@ -172,8 +172,6 @@ def test(
         raise ValueError(f"Input file '{input}' does not exist.")
 
     os.makedirs("tmp", exist_ok=True)
-    with open("tmp/output.txt", "w") as f:
-        f.write("")
 
     match tool:
         case tool if tool in ["qt-gl", "qt-cd"]:
@@ -346,6 +344,7 @@ def test(
 
             try:
                 output = run(command, "OLSQ2", time_limit)
+                print(output)
             except subprocess.TimeoutExpired:
                 return "TO"
 

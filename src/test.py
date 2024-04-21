@@ -344,7 +344,6 @@ def test(
 
             try:
                 output = run(command, "OLSQ2", time_limit)
-                print(output)
             except subprocess.TimeoutExpired:
                 return "TO"
 
@@ -389,7 +388,6 @@ def test(
                     f"tmp/{platform}_{input_name}.json", platform_depth, gate_lines
                 )
                 if cx_optimal:
-                    # TODO: something is wrong with the initial mapping that tb-olsq2 gives out
                     result_circuit = reinsert_unary_gates(
                         input_circuit, circuit, initial_mapping, ancillaries=True
                     )
@@ -455,7 +453,6 @@ TODO
   - Try "./test {qt, olsq2, q-synth} qt/benchmarks/adder.qasm melbourne -swap -cx -anc"
 - Write out experiments file
 
-- Figure out what is wrong with init-map in TB-OLSQ2
 
 # I think fixed?
 - Why does Q-synth write out two times?
@@ -471,6 +468,8 @@ TODO
   - Removed layout tries, since then SABRE is only run "once"
   - Picked swap_trials=8, since SABRE defaults to the number of processors of which 8 is typical and now we have reproducibility
   - Also set seed=0 for reproducibility
+- Figure out what is wrong with init-map in TB-OLSQ2
+  - Fixed by parsing the gate mapping when in blocks
 """
 
 print(

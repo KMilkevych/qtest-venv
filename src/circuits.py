@@ -3,6 +3,7 @@ import json
 import math
 import re
 
+import sys
 from typing import Any
 from qiskit import QuantumCircuit, QuantumRegister, qasm2
 from qiskit.circuit import Qubit, Instruction, CircuitInstruction
@@ -124,22 +125,23 @@ def parse_olsq2_circuit(
             parts = line.split(" ")
             qubits = list(map(int, parts[4][1:-1].split(",")))
             time = int(parts[7])
-            gates.append(("swap", qubits, time))
+            gates.append(("swap", qubits, time, sys.maxsize))
         else:
             parts = re.search(
                 r"Gate (\d+): (\w+) (.+) on (qubits|qubit) (.+) at time (\d+)", line
             )
             if parts is None:
                 raise ValueError(f"Could not parse gate line: {line}")
+            gate_id = int(parts.group(1))
             gate_name = parts.group(2)
             qubits = list(map(int, parts.group(5).split(" and ")))
             time = int(parts.group(6))
-            gates.append((gate_name, qubits, time))
+            gates.append((gate_name, qubits, time, gate_id))
 
-    gates = sorted(gates, key=lambda x: x[2])
+    gates = sorted(gates, key=lambda x: (x[2], x[3]))
     register = QuantumRegister(platform_depth, "q")
     result_circuit = QuantumCircuit(register)
-    for gate_name, qubits, time in gates:
+    for gate_name, qubits, time, gate_id in gates:
         match gate_name:
             case "swap":
                 result_circuit.swap(qubits[0], qubits[1])

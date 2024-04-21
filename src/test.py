@@ -409,7 +409,7 @@ def test(
             coupling_map = PLATFORMS[platform][1]
             circuit = QuantumCircuit.from_qasm_file(input)
             sabre = SabreLayout(
-                CouplingMap(coupling_map), swap_trials=100, layout_trials=100
+                CouplingMap(coupling_map), swap_trials=8, seed=0
             )
             dag = circuit_to_dag(circuit)
 
@@ -452,11 +452,9 @@ def test(
 TODO
 - Fix simulations
   - Try "./test {qt, olsq2, q-synth} qt/benchmarks/adder.qasm melbourne -swap -cx -anc"
-
 - Write out experiments file
-- Figure out what is wrong with init-map in TB-OLSQ2
-- SABRE tries!
 
+- Figure out what is wrong with init-map in TB-OLSQ2
 
 # I think fixed?
 - Why does Q-synth write out two times?
@@ -468,6 +466,10 @@ TODO
 - Broken pipe error after timeout (OLSQ2)
   - Problem was that child process would die with an error and return it to the parent (our terminal)
   - I fixed this by redirecting the error to /dev/null
+- SABRE tries!
+  - Removed layout tries, since then SABRE is only run "once"
+  - Picked swap_trials=8, since SABRE defaults to the number of processors of which 8 is typical and now we have reproducibility
+  - Also set seed=0 for reproducibility
 """
 
 print(

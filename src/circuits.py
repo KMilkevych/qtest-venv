@@ -587,7 +587,12 @@ def make_final_mapping(
             physical1 not in reverse_mapping.keys()
             or physical2 not in reverse_mapping.keys()
         ):
-            if physical1 not in reverse_mapping.keys():
+            if (
+                physical1 not in reverse_mapping.keys()
+                and physical2 not in reverse_mapping.keys()
+            ):
+                pass
+            elif physical1 not in reverse_mapping.keys():
                 reverse_mapping[physical1] = reverse_mapping[physical2]
                 del reverse_mapping[physical2]
             else:

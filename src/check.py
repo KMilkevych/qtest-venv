@@ -42,6 +42,8 @@ def equality_check(
     initial_mapping: dict[LogicalQubit, PhysicalQubit],
     ancillaries: bool,
 ) -> bool:
+    print(output_circuit)
+
     output_mapping = line_gate_mapping(output_circuit)
     topo_sort_gates: list[tuple[str, list[int]]] = []
     while not all(len(output_mapping[line]) == 0 for line in output_mapping.keys()):
@@ -85,6 +87,11 @@ def equality_check(
                     phys_control not in reverse_initial.keys()
                     or phys_target not in reverse_initial.keys()
                 ):
+                    if (
+                        phys_control not in reverse_initial.keys()
+                        and phys_target not in reverse_initial.keys()
+                    ):
+                        continue
                     if phys_control not in reverse_initial.keys():
                         reverse_initial[phys_control] = reverse_initial[phys_target]
                         del reverse_initial[phys_target]
@@ -239,7 +246,12 @@ def check_qcec(
                             line not in reverse_initial.keys()
                             or other_line not in reverse_initial.keys()
                         ):
-                            if line not in reverse_initial.keys():
+                            if (
+                                line not in reverse_initial.keys()
+                                and other_line not in reverse_initial.keys()
+                            ):
+                                pass
+                            elif line not in reverse_initial.keys():
                                 reverse_initial[line] = reverse_initial[other_line]
                                 del reverse_initial[other_line]
                             else:

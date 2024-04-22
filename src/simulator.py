@@ -9,7 +9,7 @@ from circuits import (
     make_final_mapping,
 )
 
-ACCEPTED_PLATFORMS = ["tokyo", "melbourne", "tenerife"]
+ACCEPTED_PLATFORMS = ["tokyo", "tenerife"]
 
 
 def simulate_single(
@@ -18,7 +18,7 @@ def simulate_single(
     shots: int,
     with_noise: bool = True,
     final_mapping: dict[LogicalQubit, PhysicalQubit] | None = None,
-) -> dict[str, int]:
+) -> dict[str, int] | None:
     """
     Given a quantum circuit, simulate it on the given platform with noise.
 
@@ -36,8 +36,6 @@ def simulate_single(
     """
 
     match platform:
-        case "melbourne":
-            ibm_platform = FakeMelbourne()
         case "tenerife":
             ibm_platform = FakeTenerife()
         case "tokyo":
@@ -47,6 +45,10 @@ def simulate_single(
             exit(1)
 
     noise_model = NoiseModel.from_backend(ibm_platform) if with_noise else None
+    if noise_model != None:
+        for instr in circuit.data:
+            if instr.operation.name not in noise_model.basis_gates:
+                return None
 
     if final_mapping == None:
         circuit.measure_active()
@@ -102,7 +104,7 @@ def simulate(
     platform: str,
     shots: int,
     synthesized_with_anicillaries: bool = False,
-) -> float:
+) -> float | None:
     """
     Simulate the synthesized circuit on the given platform with noise.
 
@@ -137,6 +139,9 @@ def simulate(
         with_noise=True,
         final_mapping=synthesized_final_mapping,
     )
+
+    if logical_circuit_counts == None or synthesized_circuit_counts == None:
+        return None
 
     correct, _ = process_counts(logical_circuit_counts, synthesized_circuit_counts)
     return correct / shots * 100

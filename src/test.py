@@ -20,6 +20,7 @@ from circuits import (
     reinsert_unary_gates,
     remove_all_non_cx_gates,
     save_circuit,
+    with_swaps_as_cnots,
 )
 from platforms import PLATFORMS
 from simulator import ACCEPTED_PLATFORMS, simulate
@@ -144,7 +145,11 @@ def test(
     cx_optimal: bool,
     swap_optimal: bool,
     ancillaries: bool,
-) -> tuple[float | None, float, QuantumCircuit, InitialMapping] | Literal["TO"] | Literal["ERR"]:
+) -> (
+    tuple[float | None, float, QuantumCircuit, InitialMapping]
+    | Literal["TO"]
+    | Literal["ERR"]
+):
     """
     Run a tool on an input file on a platform with a time limit.
 
@@ -175,12 +180,12 @@ def test(
 
     match tool:
         case tool if tool in ["qt-gl", "qt-cd"]:
-            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s {"glucose42" if tool == "qt-gl" else "cadical153"} {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
+            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s {'glucose42' if tool == 'qt-gl' else 'cadical153'} {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
             try:
                 output = run(command, "qt", time_limit)
             except subprocess.TimeoutExpired:
                 return "TO"
-            
+
             try:
                 lines = output.split("\n")
                 if lines[-3].endswith("Timeout."):
@@ -189,7 +194,9 @@ def test(
                 match swap_optimal:
                     case True:
                         total_time_line = list(
-                            filter(lambda line: line.startswith("Total solver time"), lines)
+                            filter(
+                                lambda line: line.startswith("Total solver time"), lines
+                            )
                         )[0]
                     case False:
                         total_time_line = list(
@@ -226,7 +233,7 @@ def test(
             except subprocess.TimeoutExpired:
                 return "TO"
 
-            try: 
+            try:
                 lines = output.split("\n")
 
                 total_time_line = list(
@@ -282,7 +289,9 @@ def test(
             try:
                 lines = output.split("\n")
                 total_time_line = list(
-                    filter(lambda line: line.startswith("Total compilation time"), lines)
+                    filter(
+                        lambda line: line.startswith("Total compilation time"), lines
+                    )
                 )[0]
                 total_time = float(total_time_line.split(" = ")[1][:-1])
 
@@ -350,7 +359,9 @@ def test(
             try:
                 lines = output.split("\n")
                 total_time_line = list(
-                    filter(lambda line: line.startswith("Total compilation time"), lines)
+                    filter(
+                        lambda line: line.startswith("Total compilation time"), lines
+                    )
                 )[0]
                 total_time = float(total_time_line.split(" = ")[1][:-1])
 
@@ -407,9 +418,7 @@ def test(
                 raise ValueError("SABRE always uses ancillary SWAPs.")
             coupling_map = PLATFORMS[platform][1]
             circuit = QuantumCircuit.from_qasm_file(input)
-            sabre = SabreLayout(
-                CouplingMap(coupling_map), swap_trials=8, seed=0
-            )
+            sabre = SabreLayout(CouplingMap(coupling_map), swap_trials=8, seed=0)
             dag = circuit_to_dag(circuit)
 
             before = time.time()
@@ -452,24 +461,6 @@ TODO
 - Fix simulations
   - Try "./test {qt, olsq2, q-synth} qt/benchmarks/adder.qasm melbourne -swap -cx -anc"
 - Write out experiments file
-
-
-# I think fixed?
-- Why does Q-synth write out two times?
-  - Some legacy from when I was trying things - I cleaned up the code
-- How to choose model / solver for qt?
-  - I added two different versions of qt
-- Hack for SABRE timeouts
-  - Fine, it will never be a problem
-- Broken pipe error after timeout (OLSQ2)
-  - Problem was that child process would die with an error and return it to the parent (our terminal)
-  - I fixed this by redirecting the error to /dev/null
-- SABRE tries!
-  - Removed layout tries, since then SABRE is only run "once"
-  - Picked swap_trials=8, since SABRE defaults to the number of processors of which 8 is typical and now we have reproducibility
-  - Also set seed=0 for reproducibility
-- Figure out what is wrong with init-map in TB-OLSQ2
-  - Fixed by parsing the gate mapping when in blocks
 """
 
 print(
@@ -560,10 +551,11 @@ if not everything_correct:
     exit(0)
 
 print("  ✓ Input and output circuits are equivalent.")
+cx_for_swap_circuit = with_swaps_as_cnots(circuit, "q")
 success_rate = (
     simulate(
         input_circuit,
-        circuit,
+        cx_for_swap_circuit,
         initial_mapping,
         args.platform,
         10000,

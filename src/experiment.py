@@ -436,3 +436,6 @@ for tool in ["sabre", "qt-cd", "qt-gl", "q-synth", "tb-olsq2", "olsq2"]:
                 platform,
                 result,
             )
+            succ_str = f", success rate: {success_rate}"
+            print(f"Time: {total_time:.03f}s, depth: {depth}, CX depth: {cx_depth}, SWAPs: {swap_count}{succ_str if success_rate != None else ''}")
+

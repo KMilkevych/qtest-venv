@@ -42,8 +42,6 @@ def equality_check(
     initial_mapping: dict[LogicalQubit, PhysicalQubit],
     ancillaries: bool,
 ) -> bool:
-    print(output_circuit)
-
     output_mapping = line_gate_mapping(output_circuit)
     topo_sort_gates: list[tuple[str, list[int]]] = []
     while not all(len(output_mapping[line]) == 0 for line in output_mapping.keys()):

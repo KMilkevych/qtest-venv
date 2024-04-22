@@ -192,20 +192,20 @@ def test(
 
                 match swap_optimal:
                     case True:
-                        total_time_line = list(
+                        solver_time_line = list(
                             filter(
                                 lambda line: line.startswith("Total solver time"), lines
                             )
                         )[0]
                     case False:
-                        total_time_line = list(
+                        solver_time_line = list(
                             filter(lambda line: line.startswith("Solver time"), lines)
                         )[0]
                 total_time_line = list(
                     filter(lambda line: line.startswith("Total time"), lines)
                 )[0]
 
-                total_time = float(total_time_line.split(": ")[1].split(" ")[0])
+                solver_time = float(solver_time_line.split(": ")[1].split(" ")[0])
                 total_time = float(total_time_line.split(": ")[1].split(" ")[0])
 
                 circuit = QuantumCircuit.from_qasm_file("tmp/output.qasm")
@@ -216,7 +216,7 @@ def test(
                     LogicalQubit(int(raw[0])): PhysicalQubit(int(raw[1]))
                     for raw in raw_initial_mapping
                 }
-                return total_time, total_time, circuit, initial_mapping
+                return solver_time, total_time, circuit, initial_mapping
             except Exception as e:
                 print(f"Error in parsing output: {e}")
                 return "ERR"

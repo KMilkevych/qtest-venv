@@ -571,7 +571,10 @@ print(f"Total time: {total_time:.03f}s")
 print(f"Depth: {depth}")
 print(f"CX-depth: {cx_depth}")
 print(f"Swap count: {swap_count}")
-print(f"Success rate: {success_rate:.03f}%")
+if success_rate != None:
+    print(f"Success rate: {success_rate:.03f}%")
+else:
+    print("Success rate: N/A")
 
 result = (solver_time, total_time, depth, cx_depth, swap_count, success_rate)
 output_csv(

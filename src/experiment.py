@@ -293,9 +293,9 @@ time_limit = 7200
 for tool in ["sabre", "qt-cd", "qt-gl", "q-synth", "tb-olsq2", "olsq2"]:
     for benchmark, platform in (
         EXPERIMENTS
-        + EXPERIMENTS_TRANSPILED
+        #+ EXPERIMENTS_TRANSPILED
         + VQE_EXPERIMENTS
-        + VQE_EXPERIMENTS_TRANSPILED
+        #+ VQE_EXPERIMENTS_TRANSPILED
         + QUEKO_EXPERIMENTS
     ):
         match tool:
@@ -346,7 +346,7 @@ for tool in ["sabre", "qt-cd", "qt-gl", "q-synth", "tb-olsq2", "olsq2"]:
                     "TO",
                 )
                 print("Timeout.")
-                exit(0)
+                continue
             if result == "ERROR":
                 output_csv(
                     tool,
@@ -358,7 +358,7 @@ for tool in ["sabre", "qt-cd", "qt-gl", "q-synth", "tb-olsq2", "olsq2"]:
                     "ERROR",
                 )
                 print("Error.")
-                exit(0)
+                continue
 
             solver_time, total_time, circuit, initial_mapping = result
             depth, cx_depth, swap_count = get_stats(circuit)
@@ -402,9 +402,7 @@ for tool in ["sabre", "qt-cd", "qt-gl", "q-synth", "tb-olsq2", "olsq2"]:
                     platform,
                     "ERROR",
                 )
-
-                exit(0)
-
+                continue
             print("  ✓ Input and output circuits are equivalent.")
             success_rate = (
                 simulate(

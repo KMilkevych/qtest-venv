@@ -20,7 +20,6 @@ from circuits import (
     reinsert_unary_gates,
     remove_all_non_cx_gates,
     save_circuit,
-    with_swaps_as_cnots,
 )
 from platforms import PLATFORMS
 from simulator import ACCEPTED_PLATFORMS, simulate
@@ -551,11 +550,10 @@ if not everything_correct:
     exit(0)
 
 print("  ✓ Input and output circuits are equivalent.")
-cx_for_swap_circuit = with_swaps_as_cnots(circuit, "q")
 success_rate = (
     simulate(
         input_circuit,
-        cx_for_swap_circuit,
+        circuit,
         initial_mapping,
         args.platform,
         10000,

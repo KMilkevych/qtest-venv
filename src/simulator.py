@@ -1,12 +1,13 @@
 from qiskit import ClassicalRegister, QuantumCircuit
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
-from qiskit_ibm_runtime.fake_provider import FakeMelbourne, FakeTenerife, FakeTokyo
+from qiskit_ibm_runtime.fake_provider import FakeTenerife, FakeTokyo
 
 from circuits import (
     LogicalQubit,
     PhysicalQubit,
     make_final_mapping,
+    with_swaps_as_cnots,
 )
 
 ACCEPTED_PLATFORMS = ["tokyo", "tenerife"]
@@ -16,7 +17,7 @@ def simulate_single(
     circuit: QuantumCircuit,
     platform: str,
     shots: int,
-    with_noise: bool = True,
+    with_noise: bool = False,
     final_mapping: dict[LogicalQubit, PhysicalQubit] | None = None,
 ) -> dict[str, int] | None:
     """
@@ -25,9 +26,9 @@ def simulate_single(
     Args
     ----
     - circuit (`QuantumCircuit`): The quantum circuit to simulate.
-    - platform (`Platform`): The platform to simulate the circuit on.
+    - platform (`str`): The name of the platform to simulate the circuit on.
     - shots (`int`): The number of shots to simulate.
-    - with_noise (`bool`): Whether to simulate with noise. Defaults to `True`.
+    - with_noise (`bool`): Whether to simulate with noise. Defaults to `False`.
     - final_mapping (`dict[LogicalQubit, PhysicalQubit] | None`): The final mapping of the circuit. If `None`, the circuit is measured in the active qubits. Defaults to `None`.
 
     Returns
@@ -113,7 +114,7 @@ def simulate(
     - logical_circuit (`QuantumCircuit`): The logical circuit to simulate.
     - synthesized_circuit (`QuantumCircuit`): The synthesized circuit to simulate.
     - synthesized_initial_mapping (`dict[LogicalQubit, PhysicalQubit]`): The initial mapping of the synthesized circuit.
-    - platform (`Platform`): The platform to simulate the circuit on.
+    - platform (`str`): The name of the platform to simulate the circuit on.
     - shots (`int`): The number of shots to simulate.
     - synthesized_with_anicillaries (`bool`): Whether the synthesized circuit uses ancillary SWAPs. Defaults to `False`.
 
@@ -132,8 +133,9 @@ def simulate(
     synthesized_final_mapping = make_final_mapping(
         synthesized_circuit, synthesized_initial_mapping, synthesized_with_anicillaries
     )
+    cx_for_swap_circuit = with_swaps_as_cnots(synthesized_circuit, "q")
     synthesized_circuit_counts = simulate_single(
-        synthesized_circuit,
+        cx_for_swap_circuit,
         platform,
         shots,
         with_noise=True,

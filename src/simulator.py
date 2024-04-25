@@ -2,7 +2,7 @@ from typing import Any
 from qiskit import ClassicalRegister, QuantumCircuit
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, QuantumError, pauli_error
-from qiskit_ibm_runtime.fake_provider import FakeTenerife, FakeTokyo
+from qiskit_ibm_runtime.fake_provider import FakeTenerife, FakeTokyo, FakeCambridge
 from qiskit.circuit.library import IGate, XGate, YGate, ZGate
 
 from circuits import (
@@ -12,7 +12,7 @@ from circuits import (
     with_swaps_as_cnots,
 )
 
-ACCEPTED_PLATFORMS = ["tokyo", "tenerife"]
+ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge"]
 
 
 def simulate_single(
@@ -43,6 +43,8 @@ def simulate_single(
             ibm_platform = FakeTenerife()
         case "tokyo":
             ibm_platform = FakeTokyo()
+        case "cambridge":
+            ibm_platform = FakeCambridge()
         case _:
             print(f"Error: Platform '{platform}' not supported.")
             exit(1)

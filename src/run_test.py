@@ -7,7 +7,7 @@ from circuits import (
 )
 from platforms import PLATFORMS
 from simulator import ACCEPTED_PLATFORMS, simulate
-from test import DEFAULT_TIME_LIMIT_S, TOOLS, output_csv, test
+from noise_model_out import DEFAULT_TIME_LIMIT_S, TOOLS, output_csv, test
 
 
 parser = argparse.ArgumentParser(

@@ -2,10 +2,10 @@ from typing import Any
 from qiskit import ClassicalRegister, QuantumCircuit
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, QuantumError
-from qiskit_ibm_runtime.fake_provider import FakeTenerife, FakeTokyo, FakeCambridge
 from qiskit.circuit.library import IGate, XGate, YGate, ZGate
 from qiskit.quantum_info.operators.channel import Kraus
 from qiskit.circuit.library.generalized_gates import PauliGate, UnitaryGate
+from avg_noise_models import AVG_TENERIFE, AVG_CAMBRIDGE, AVG_TOKYO
 from qiskit.circuit import Reset
 from numpy import array_equal
 
@@ -213,26 +213,6 @@ def average_noise_model(
     return average_noise_model
 
 
-tenerife = FakeTenerife()
-tenerife_noise_model = average_noise_model(
-    NoiseModel.from_backend(tenerife),
-    tenerife.configuration().n_qubits,
-    len(tenerife.configuration().coupling_map),
-)
-tokyo = FakeTokyo()
-tokyo_noise_model = average_noise_model(
-    NoiseModel.from_backend(tokyo),
-    tokyo.configuration().n_qubits,
-    len(tokyo.configuration().coupling_map),
-)
-cambridge = FakeCambridge()
-cambridge_noise_model = average_noise_model(
-    NoiseModel.from_backend(cambridge),
-    cambridge.configuration().n_qubits,
-    len(cambridge.configuration().coupling_map),
-)
-
-
 def simulate_single(
     circuit: QuantumCircuit,
     platform: str,
@@ -258,11 +238,11 @@ def simulate_single(
 
     match platform:
         case "tenerife":
-            noise_model = tenerife_noise_model
+            noise_model = NoiseModel.from_dict(AVG_TENERIFE)
         case "tokyo":
-            noise_model = tokyo_noise_model
+            noise_model = NoiseModel.from_dict(AVG_TOKYO)
         case "cambridge":
-            noise_model = cambridge_noise_model
+            noise_model = NoiseModel.from_dict(AVG_CAMBRIDGE)
         case _:
             print(f"Error: Platform '{platform}' not supported.")
             exit(1)
@@ -378,6 +358,11 @@ def simulate(
         return None
 
     ham_results = process_counts(logical_circuit_counts, synthesized_circuit_counts)
-    avg_ham = sum([float(ham) * (float(count) / float(shots)) for ham, count in ham_results.items()])
+    avg_ham = sum(
+        [
+            float(ham) * (float(count) / float(shots))
+            for ham, count in ham_results.items()
+        ]
+    )
 
     return avg_ham

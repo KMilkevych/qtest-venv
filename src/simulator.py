@@ -5,7 +5,7 @@ from qiskit_aer.noise import NoiseModel, QuantumError
 from qiskit.circuit.library import IGate, XGate, YGate, ZGate
 from qiskit.quantum_info.operators.channel import Kraus
 from qiskit.circuit.library.generalized_gates import PauliGate, UnitaryGate
-from avg_noise_models import AVG_TENERIFE, AVG_CAMBRIDGE, AVG_TOKYO
+from avg_noise_models import AVG_TENERIFE, AVG_CAMBRIDGE, AVG_TOKYO, AVG_GUADALUPE
 from qiskit.circuit import Reset
 from numpy import array_equal
 
@@ -16,7 +16,7 @@ from circuits import (
     with_swaps_as_cnots,
 )
 
-ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge"]
+ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge", "guadalupe"]
 
 
 def average_noise_model(
@@ -243,6 +243,8 @@ def simulate_single(
             noise_model = NoiseModel.from_dict(AVG_TOKYO)
         case "cambridge":
             noise_model = NoiseModel.from_dict(AVG_CAMBRIDGE)
+        case "guadalupe":
+            noise_model = NoiseModel.from_dict(AVG_GUADALUPE)
         case _:
             print(f"Error: Platform '{platform}' not supported.")
             exit(1)

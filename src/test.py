@@ -52,7 +52,7 @@ def output_csv(
     input: str,
     platform: str,
     result: (
-        tuple[float | None, float, int, int, int, float | None] | Literal["TO", "ERROR"]
+        tuple[float | None, float, int, int, int, float | None] | str
     ),
 ):
     line = f"{tool};{cx_opt};{swap_opt};{anc};{input};{platform};"
@@ -394,9 +394,3 @@ def test(
             raise ValueError(f"Unknown tool: '{tool}'.")
 
 
-"""
-TODO
-- Fix simulations
-  - Try "./test {qt, olsq2, q-synth} qt/benchmarks/adder.qasm melbourne -swap -cx -anc"
-- Write out experiments file
-"""

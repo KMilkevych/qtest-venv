@@ -24,10 +24,10 @@ index 0000000..b9184bd
 +requires = ["poetry-core"]
 +build-backend = "poetry.core.masonry.api"
 diff --git a/OLSQ2/run_olsq.py b/OLSQ2/run_olsq.py
-index 3c52d0c..a3869a5 100644
+index 3c52d0c..06cb956 100644
 --- a/OLSQ2/run_olsq.py
 +++ b/OLSQ2/run_olsq.py
-@@ -9,106 +9,658 @@ def get_nnGrid(n: int, swap_duration):
+@@ -9,106 +9,693 @@ def get_nnGrid(n: int, swap_duration):
      my_coupling = []
      for i in range(n):
          for j in range(n):
@@ -657,6 +657,40 @@ index 3c52d0c..a3869a5 100644
 +            (78, 79),
 +            (79, 72),
 +        ],
++        "guadalupe": [
++            (0, 1),
++            (1, 0),
++            (1, 2),
++            (1, 4),
++            (2, 1),
++            (2, 3),
++            (3, 2),
++            (3, 5),
++            (4, 1),
++            (4, 7),
++            (5, 3),
++            (5, 8),
++            (6, 7),
++            (7, 4),
++            (7, 6),
++            (7, 10),
++            (8, 5),
++            (8, 9),
++            (8, 11),
++            (9, 8),
++            (10, 7),
++            (10, 12),
++            (11, 8),
++            (11, 14),
++            (12, 10),
++            (12, 13),
++            (12, 15),
++            (13, 12),
++            (13, 14),
++            (14, 11),
++            (14, 13),
++            (15, 12),
++        ],
 +    }
 +
 +    device_set_qubit_num = {
@@ -671,6 +705,7 @@ index 3c52d0c..a3869a5 100644
 +        "tenerife": 5,
 +        "eagle": 127,
 +        "rigetti80": 80,
++        "guadalupe": 16,
 +    }
 +
 +    device = qcdevice(
@@ -771,7 +806,7 @@ index 3c52d0c..a3869a5 100644
      # Read arguments from command line
  
      args = parser.parse_args()
-@@ -120,16 +672,18 @@ if __name__ == "__main__":
+@@ -120,16 +707,18 @@ if __name__ == "__main__":
          device = get_device_by_name(args.device_type, args.swap_duration)
  
      data = dict()
@@ -794,7 +829,7 @@ index 3c52d0c..a3869a5 100644
      data["device"] = str(args.device)
      data["mode"] = mode
      data["depth"] = result[0]
-@@ -137,7 +691,6 @@ if __name__ == "__main__":
+@@ -137,7 +726,6 @@ if __name__ == "__main__":
      data["gate"] = result[2]
      data["final_mapping"] = result[3]
      data["initial_mapping"] = result[4]
@@ -807,19 +842,20 @@ index 3c52d0c..a3869a5 100644
 Submodule Q-Synth contains untracked content
 Submodule Q-Synth contains modified content
 diff --git a/Q-Synth/architecture.py b/Q-Synth/architecture.py
-index c817c85..139f5a5 100644
+index c817c85..549dfdb 100644
 --- a/Q-Synth/architecture.py
 +++ b/Q-Synth/architecture.py
-@@ -3,16 +3,19 @@
+@@ -3,16 +3,22 @@
  from qiskit.providers.fake_provider import FakeTokyo
  from qiskit.providers.fake_provider import FakeTenerife
  from qiskit.providers.fake_provider import FakeMelbourne
 +from qiskit.providers.fake_provider import FakeCambridge
++from qiskit.providers.fake_provider import FakeGuadalupe
  import rustworkx as rx
  
  def platform(platform, bidirectional, verbose=0):
 -    if platform in ("tenerife","melbourne","tokyo"):
-+    if platform in ("tenerife","melbourne","tokyo","cambridge"):
++    if platform in ("tenerife","melbourne","tokyo","cambridge","guadalupe"):
        if platform == "tokyo":
          arch = FakeTokyo()
        elif platform == "tenerife":
@@ -828,6 +864,8 @@ index c817c85..139f5a5 100644
          arch = FakeMelbourne()
 +      elif platform == "cambridge":
 +        arch = FakeCambridge()
++      elif platform == "guadalupe":
++        arch = FakeGuadalupe()
        num_physical_qubits = arch.configuration().n_qubits
        coupling_map = arch.configuration().coupling_map
        if verbose > 0:

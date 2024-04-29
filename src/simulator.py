@@ -4,6 +4,10 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, QuantumError, pauli_error
 from qiskit_ibm_runtime.fake_provider import FakeTenerife, FakeTokyo, FakeCambridge
 from qiskit.circuit.library import IGate, XGate, YGate, ZGate
+from qiskit.quantum_info.operators.channel import Kraus
+from qiskit.circuit.library.generalized_gates import PauliGate, UnitaryGate
+from qiskit.circuit import Reset
+from numpy import array_equal
 
 from circuits import (
     LogicalQubit,
@@ -15,107 +19,182 @@ from circuits import (
 ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge"]
 
 
-def average_noise_model(noise_model: NoiseModel) -> NoiseModel:
+def average_noise_model(
+    noise_model: NoiseModel, num_of_qubits: int, num_of_edges_in_coupling_map: int
+) -> NoiseModel:
     original_errors: list[dict[str, Any]] = noise_model.to_dict()["errors"]
 
-    original_cx_errors = [
-        error
-        for error in original_errors
-        if error["type"] == "qerror" and error["operations"][0] == "cx"
+    original_gate_errors = [
+        error for error in original_errors if error["type"] == "qerror"
     ]
-    original_unary_gate_errors = [
-        error
-        for error in original_errors
-        if error["type"] == "qerror" and error["operations"][0] != "cx"
-    ]
+
     original_readout_errors = [
         error for error in original_errors if error["type"] == "roerror"
     ]
-    num_of_qubits = len(original_readout_errors)
-
-    if len(original_errors) != len(original_cx_errors) + len(
-        original_unary_gate_errors
-    ) + len(original_readout_errors):
-        raise ValueError(
-            "Original errors are not disjoint or they are incomplete. (Perhaps there are other binary gates that CX in the noise model?)"
-        )
 
     average_noise_model = NoiseModel([instr for instr in noise_model.basis_gates])
 
-    # UNARY GATE ERROR
-    average_unary_gate_error = {}
-    for error in original_unary_gate_errors:
-        gate_name = error["operations"][0]
-        if gate_name not in average_unary_gate_error:
-            average_unary_gate_error[gate_name] = [0.0] * 4
-        average_unary_gate_error[gate_name][0] += error["probabilities"][0]
-        average_unary_gate_error[gate_name][1] += error["probabilities"][1]
-        average_unary_gate_error[gate_name][2] += error["probabilities"][2]
-        average_unary_gate_error[gate_name][3] += error["probabilities"][3]
+    # GATE ERRORS
+    instr_op_prob = []
+    for error in original_gate_errors:
+        instructions = error["instructions"]
+        probabilities = error["probabilities"]
+        instr_with_prob = list(zip(instructions, probabilities, strict=True))
+        for instr, prob in instr_with_prob:
+            instr_op_prob.append((instr, error["operations"], prob))
 
-    for gate_name in average_unary_gate_error:
-        for i in range(4):
-            average_unary_gate_error[gate_name][i] /= num_of_qubits
+    groups = []
 
-    for gate_name in average_unary_gate_error:
-        average_noise_model.add_all_qubit_quantum_error(
-            QuantumError(
-                noise_ops=[
-                    (IGate(), average_unary_gate_error[gate_name][0]),
-                    (XGate(), average_unary_gate_error[gate_name][1]),
-                    (YGate(), average_unary_gate_error[gate_name][2]),
-                    (ZGate(), average_unary_gate_error[gate_name][3]),
-                ],
-            ),
-            [gate_name],
-        )
+    while instr_op_prob:
+        candidate = instr_op_prob.pop()
+        group = [candidate]
+        equal_indexes = []
+        for i in range(len(instr_op_prob)):
+            if i >= len(instr_op_prob):
+                break
 
-    # CX GATE ERROR
-    average_cx_error = [0.0] * 16
-    for error in original_cx_errors:
-        average_cx_error[0] += error["probabilities"][0]
-        average_cx_error[1] += error["probabilities"][1]
-        average_cx_error[2] += error["probabilities"][2]
-        average_cx_error[3] += error["probabilities"][3]
-        average_cx_error[4] += error["probabilities"][4]
-        average_cx_error[5] += error["probabilities"][5]
-        average_cx_error[6] += error["probabilities"][6]
-        average_cx_error[7] += error["probabilities"][7]
-        average_cx_error[8] += error["probabilities"][8]
-        average_cx_error[9] += error["probabilities"][9]
-        average_cx_error[10] += error["probabilities"][10]
-        average_cx_error[11] += error["probabilities"][11]
-        average_cx_error[12] += error["probabilities"][12]
-        average_cx_error[13] += error["probabilities"][13]
-        average_cx_error[14] += error["probabilities"][14]
-        average_cx_error[15] += error["probabilities"][15]
+            candidate_instr = candidate[0]
+            compare_instr = instr_op_prob[i][0]
+            candidate_op = candidate[1]
+            compare_op = instr_op_prob[i][1]
 
-    for i in range(16):
-        average_cx_error[i] /= len(original_cx_errors)
+            if candidate_op != compare_op:
+                continue
 
-    average_noise_model.add_all_qubit_quantum_error(
-        pauli_error(
-            [
-                ("II", average_cx_error[0]),
-                ("IX", average_cx_error[1]),
-                ("IY", average_cx_error[2]),
-                ("IZ", average_cx_error[3]),
-                ("XI", average_cx_error[4]),
-                ("XX", average_cx_error[5]),
-                ("XY", average_cx_error[6]),
-                ("XZ", average_cx_error[7]),
-                ("YI", average_cx_error[8]),
-                ("YX", average_cx_error[9]),
-                ("YY", average_cx_error[10]),
-                ("YZ", average_cx_error[11]),
-                ("ZI", average_cx_error[12]),
-                ("ZX", average_cx_error[13]),
-                ("ZY", average_cx_error[14]),
-                ("ZZ", average_cx_error[15]),
+            candidate_contains_kraus = any(
+                [part["name"] == "kraus" for part in candidate_instr]
+            )
+            compare_contains_kraus = any(
+                [part["name"] == "kraus" for part in compare_instr]
+            )
+
+            if candidate_contains_kraus and not compare_contains_kraus:
+                continue
+
+            if not candidate_contains_kraus and compare_contains_kraus:
+                continue
+
+            if (
+                not candidate_contains_kraus
+                and not compare_contains_kraus
+                and candidate_instr != compare_instr
+            ):
+                continue
+
+            if (
+                not candidate_contains_kraus
+                and not compare_contains_kraus
+                and candidate_instr == compare_instr
+            ):
+                equal_indexes.append(i)
+                continue
+
+            kraus_instr_appears_at_same_index = [
+                part["name"] == "kraus" for part in candidate_instr
+            ] == [part["name"] == "kraus" for part in compare_instr]
+
+            if not kraus_instr_appears_at_same_index:
+                continue
+
+            candidate_non_kraus_parts = [
+                part for part in candidate_instr if part["name"] != "kraus"
             ]
-        ),
-        ["cx"],
-    )
+            compare_non_kraus_parts = [
+                part for part in compare_instr if part["name"] != "kraus"
+            ]
+
+            if candidate_non_kraus_parts != compare_non_kraus_parts:
+                continue
+
+            candidate_kraus_parts = [
+                part for part in candidate_instr if part["name"] == "kraus"
+            ]
+            compare_kraus_parts = [
+                part for part in compare_instr if part["name"] == "kraus"
+            ]
+
+            comparing = zip(candidate_kraus_parts, compare_kraus_parts)
+            all_equal = True
+            for candidate_kraus_part, compare_kraus_part in comparing:
+                qubits_equal = (
+                    candidate_kraus_part["qubits"] == compare_kraus_part["qubits"]
+                )
+                # params are numpy arrays, hence we need to check that all elements are equal
+                params_equal = array_equal(
+                    candidate_kraus_part["params"], compare_kraus_part["params"]
+                )
+
+                if qubits_equal and params_equal:
+                    continue
+                else:
+                    all_equal = False
+                    break
+
+            if all_equal:
+                equal_indexes.append(i)
+
+        for index in equal_indexes:
+            group.append(instr_op_prob[index])
+
+        for member in group[1:]:
+            instr_op_prob.remove(member)
+
+        groups.append(group)
+
+    op_to_instr_prob = {}
+    for group in groups:
+        instr = group[0][0]
+        ops = group[0][1]
+        if len(ops) > 1:
+            raise ValueError("Multiple operations in a group")
+        op = ops[0]
+
+        probs = [member[2] for member in group]
+
+        if op == "cx":
+            avg_prob = sum(probs) / num_of_edges_in_coupling_map
+        else:
+            avg_prob = sum(probs) / num_of_qubits
+
+        if op not in op_to_instr_prob:
+            op_to_instr_prob[op] = [(instr, avg_prob)]
+        else:
+            op_to_instr_prob[op].append((instr, avg_prob))
+
+    for op, instr_prob in op_to_instr_prob.items():
+        noise_ops = []
+        for instr, prob in instr_prob:
+            noise_elem = []
+            for part in instr:
+                name = part["name"]
+                qubits = part["qubits"]
+                match name:
+                    case "id":
+                        noise_elem.append((IGate(), qubits))
+                    case "x":
+                        noise_elem.append((XGate(), qubits))
+                    case "y":
+                        noise_elem.append((YGate(), qubits))
+                    case "z":
+                        noise_elem.append((ZGate(), qubits))
+                    case "kraus":
+                        params = part["params"]
+                        noise_elem.append((Kraus(params), qubits))
+                    case "reset":
+                        noise_elem.append((Reset(), qubits))
+                    case "unitary":
+                        params = part["params"][0]
+                        noise_elem.append((UnitaryGate(params), qubits))
+                    case "pauli":
+                        params = part["params"][0]
+                        noise_elem.append((PauliGate(params), qubits))
+                    case _:
+                        raise ValueError(f"Unknown instruction: '{name}'")
+
+            noise_ops.append((noise_elem, prob))
+
+        error = QuantumError(noise_ops)
+        average_noise_model.add_all_qubit_quantum_error(error, [op])
 
     # READOUT ERROR
     average_readout_error = [[0.0, 0.0], [0.0, 0.0]]
@@ -134,9 +213,24 @@ def average_noise_model(noise_model: NoiseModel) -> NoiseModel:
     return average_noise_model
 
 
-tenerife_noise_model = average_noise_model(NoiseModel.from_backend(FakeTenerife()))
-tokyo_noise_model = average_noise_model(NoiseModel.from_backend(FakeTokyo()))
-cambridge_noise_model = average_noise_model(NoiseModel.from_backend(FakeCambridge()))
+tenerife = FakeTenerife()
+tenerife_noise_model = average_noise_model(
+    NoiseModel.from_backend(tenerife),
+    tenerife.configuration().n_qubits,
+    len(tenerife.configuration().coupling_map),
+)
+tokyo = FakeTokyo()
+tokyo_noise_model = average_noise_model(
+    NoiseModel.from_backend(tokyo),
+    tokyo.configuration().n_qubits,
+    len(tokyo.configuration().coupling_map),
+)
+cambridge = FakeCambridge()
+cambridge_noise_model = average_noise_model(
+    NoiseModel.from_backend(cambridge),
+    cambridge.configuration().n_qubits,
+    len(cambridge.configuration().coupling_map),
+)
 
 
 def simulate_single(

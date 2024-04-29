@@ -29,7 +29,7 @@ def run(command: str, path: str, time_limit: int):
     """
     Run a command in a given path.
     """
-    #print(f"Running '{command}' in '{path}'")
+    # print(f"Running '{command}' in '{path}'")
     command_string = f"cd {path}; source .venv/bin/activate; {command}"
     return subprocess.check_output(
         f'/bin/bash -c "{command_string} 2> /dev/null"', shell=True, timeout=time_limit

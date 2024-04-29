@@ -39,7 +39,7 @@ def run(command: str, path: str, time_limit: int):
 CSV_OUTPUT_FILE = "tmp/output.csv"
 if not os.path.exists(CSV_OUTPUT_FILE):
     os.makedirs(os.path.dirname(CSV_OUTPUT_FILE), exist_ok=True)
-    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Success rate (%)"
+    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Avg. Hamming distance"
     with open(CSV_OUTPUT_FILE, "a") as f:
         f.write(line + "\n")
 
@@ -64,15 +64,15 @@ def output_csv(
         depth = result[2]
         cx_depth = result[3]
         swaps = result[4]
-        success_rate = result[5]
+        avg_ham = result[5]
 
         if solver_time == None:
             line += f";"
         else:
             line += f"{solver_time:.3f};"
         line += f"{total_time:.3f};{depth};{cx_depth};{swaps};"
-        if success_rate != None:
-            line += f"{success_rate:.3f}"
+        if avg_ham != None:
+            line += f"{avg_ham:.3f}"
     with open(CSV_OUTPUT_FILE, "a") as f:
         f.write(line + "\n")
 

@@ -160,7 +160,7 @@ if not everything_correct:
     exit(0)
 
 print("  ✓ Input and output circuits are equivalent.")
-success_rate = (
+avg_ham = (
     simulate(
         input_circuit,
         circuit,
@@ -181,12 +181,12 @@ print(f"Total time: {total_time:.03f}s")
 print(f"Depth: {depth}")
 print(f"CX-depth: {cx_depth}")
 print(f"Swap count: {swap_count}")
-if success_rate != None:
-    print(f"Success rate: {success_rate:.03f}%")
+if avg_ham != None:
+    print(f"Avg. Hamming distance: {avg_ham:.03f}")
 else:
-    print("Success rate: N/A")
+    print("Avg. Hamming distance: N/A")
 
-result = (solver_time, total_time, depth, cx_depth, swap_count, success_rate)
+result = (solver_time, total_time, depth, cx_depth, swap_count, avg_ham)
 output_csv(
     args.tool,
     args.cx_optimal,

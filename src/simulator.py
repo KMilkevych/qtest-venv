@@ -1,7 +1,7 @@
 from typing import Any
 from qiskit import ClassicalRegister, QuantumCircuit
 from qiskit_aer import AerSimulator
-from qiskit_aer.noise import NoiseModel, QuantumError, pauli_error
+from qiskit_aer.noise import NoiseModel, QuantumError
 from qiskit_ibm_runtime.fake_provider import FakeTenerife, FakeTokyo, FakeCambridge
 from qiskit.circuit.library import IGate, XGate, YGate, ZGate
 from qiskit.quantum_info.operators.channel import Kraus
@@ -294,12 +294,20 @@ def simulate_single(
     return counts  # type: ignore
 
 
+def hamming_dist(bools1: str, bools2: str) -> int:
+    dist = 0
+    for i in range(len(bools1)):
+        if bools1[i] != bools2[i]:
+            dist += 1
+    return dist
+
+
 def process_counts(
     control_counts: dict[str, int],
     noise_counts: dict[str, int],
-) -> tuple[int, int]:
+) -> dict[int, int]:
     """
-    Given two dictionaries of counts, return the number of correct and wrong measurements.
+    Given two dictionaries of counts, return the number of measurements with each Hamming distance.
 
     Args
     ----
@@ -308,18 +316,18 @@ def process_counts(
 
     Returns
     --------
-    - `tuple[int, int]`: A tuple of the number of correct and wrong measurements respectively.
+    - `float`: A dict with the counts for each Hamming distance.
     """
 
-    correct = 0
-    wrong = 0
+    results: dict[int, int] = {}
     for measurement, count in noise_counts.items():
-        if measurement in control_counts.keys():
-            correct += count
+        min_ham = min([hamming_dist(key, measurement) for key in control_counts.keys()])
+        if min_ham in results.keys():
+            results[min_ham] += count
         else:
-            wrong += count
+            results[min_ham] = count
 
-    return correct, wrong
+    return results
 
 
 def simulate(
@@ -344,7 +352,7 @@ def simulate(
 
     Returns
     --------
-    - `float`: The percentage of correct measurements.
+    - `float`: Average Hamming distance.
     """
 
     logical_circuit_counts = simulate_single(
@@ -369,5 +377,7 @@ def simulate(
     if logical_circuit_counts == None or synthesized_circuit_counts == None:
         return None
 
-    correct, _ = process_counts(logical_circuit_counts, synthesized_circuit_counts)
-    return correct / shots * 100
+    ham_results = process_counts(logical_circuit_counts, synthesized_circuit_counts)
+    avg_ham = sum([float(ham) * (float(count) / float(shots)) for ham, count in ham_results.items()])
+
+    return avg_ham

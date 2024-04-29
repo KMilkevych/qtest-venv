@@ -1,8 +1,7 @@
-Submodule OLSQ2 contains untracked content
 Submodule OLSQ2 contains modified content
 diff --git a/OLSQ2/pyproject.toml b/OLSQ2/pyproject.toml
 new file mode 100644
-index 0000000..b9184bd
+index 0000000..5b0225a
 --- /dev/null
 +++ b/OLSQ2/pyproject.toml
 @@ -0,0 +1,17 @@
@@ -14,7 +13,7 @@ index 0000000..b9184bd
 +readme = "README.md"
 +
 +[tool.poetry.dependencies]
-+python = "^3.8.10"
++python = "~3.8"
 +python-sat = {extras = ["aiger", "approxmc", "cryptosat", "pblib"], version = "^1.8.dev1"}
 +qiskit = "=0.45"
 +z3-solver = "^4.13.0.0"
@@ -839,7 +838,6 @@ index 3c52d0c..06cb956 100644
 +    with open(file_name, "w") as file_object:
          json.dump(data, file_object, default=int)
 -    
-Submodule Q-Synth contains untracked content
 Submodule Q-Synth contains modified content
 diff --git a/Q-Synth/architecture.py b/Q-Synth/architecture.py
 index c817c85..549dfdb 100644
@@ -869,28 +867,6 @@ index c817c85..549dfdb 100644
        num_physical_qubits = arch.configuration().n_qubits
        coupling_map = arch.configuration().coupling_map
        if verbose > 0:
-diff --git a/Q-Synth/pyproject.toml b/Q-Synth/pyproject.toml
-new file mode 100644
-index 0000000..fd9b0eb
---- /dev/null
-+++ b/Q-Synth/pyproject.toml
-@@ -0,0 +1,16 @@
-+[tool.poetry]
-+name = "q-synth"
-+version = "0.1.0"
-+description = ""
-+authors = ["Anders B. Clausen <anbclausen@users.noreply.github.com>"]
-+readme = "README.md"
-+
-+[tool.poetry.dependencies]
-+python = "^3.12"
-+python-sat = {extras = ["aiger", "approxmc", "cryptosat", "pblib"], version = "^1.8.dev1"}
-+qiskit = "=0.46.0"
-+
-+
-+[build-system]
-+requires = ["poetry-core"]
-+build-backend = "poetry.core.masonry.api"
 diff --git a/Q-Synth/q-synth.py b/Q-Synth/q-synth.py
 index fc65125..f937889 100755
 --- a/Q-Synth/q-synth.py

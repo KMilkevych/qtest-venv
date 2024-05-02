@@ -265,7 +265,8 @@ def simulate_single(
         register_size = len(final_mapping.keys())
         classical_register = ClassicalRegister(size=register_size, name="measure")
         circuit.add_register(classical_register)
-        for q, p in final_mapping.items():
+        sorted_final_mapping = sorted(final_mapping.items(), key=lambda x: x[0].id)
+        for q, p in sorted_final_mapping:
             circuit.measure(p.id, q.id)
 
     # Perform a noise simulation

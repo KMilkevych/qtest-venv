@@ -359,13 +359,13 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
                 ]
             case tool_name if tool_name.startswith("qt"):
                 configurations = [
-                    #(False, False, False),
+                    # (False, False, False),
                     (False, False, True),
-                    #(False, True, False),
+                    # (False, True, False),
                     (False, True, True),
-                    #(True, False, False),
+                    # (True, False, False),
                     (True, False, True),
-                    #(True, True, False),
+                    # (True, True, False),
                     (True, True, True),
                 ]
             case _:
@@ -477,7 +477,7 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
                 platform,
                 result,
             )
-            ham_str = f", avg. Hamming distance: {avg_ham}"
+            ham_str = f", Hellinger distance: {avg_ham}"
             print(
                 f"Time: {total_time:.03f}s, depth: {depth}, CX depth: {cx_depth}, SWAPs: {swap_count}{ham_str if avg_ham != None else ''}"
             )

@@ -1,6 +1,7 @@
 from numpy import array
+from typing import Any
 
-AVG_TENERIFE = {
+AVG_TENERIFE: Any = {
     "errors": [
         {
             "type": "qerror",
@@ -88,7 +89,7 @@ AVG_TENERIFE = {
     ]
 }
 
-AVG_TOKYO = {
+AVG_TOKYO: Any = {
     "errors": [
         {
             "type": "qerror",
@@ -9797,7 +9798,7 @@ AVG_TOKYO = {
     ]
 }
 
-AVG_CAMBRIDGE = {
+AVG_CAMBRIDGE: Any = {
     "errors": [
         {
             "type": "qerror",
@@ -19314,7 +19315,7 @@ AVG_CAMBRIDGE = {
     ]
 }
 
-AVG_GUADALUPE = {
+AVG_GUADALUPE: Any = {
     "errors": [
         {
             "type": "qerror",

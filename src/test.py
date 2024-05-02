@@ -39,7 +39,7 @@ def run(command: str, path: str, time_limit: int):
 CSV_OUTPUT_FILE = "tmp/output.csv"
 if not os.path.exists(CSV_OUTPUT_FILE):
     os.makedirs(os.path.dirname(CSV_OUTPUT_FILE), exist_ok=True)
-    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Avg. Hamming distance"
+    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Hellinger distance"
     with open(CSV_OUTPUT_FILE, "a") as f:
         f.write(line + "\n")
 
@@ -51,9 +51,7 @@ def output_csv(
     anc: bool,
     input: str,
     platform: str,
-    result: (
-        tuple[float | None, float, int, int, int, float | None] | str
-    ),
+    result: tuple[float | None, float, int, int, int, float | None] | str,
 ):
     line = f"{tool};{cx_opt};{swap_opt};{anc};{input};{platform};"
     if isinstance(result, str):
@@ -392,5 +390,3 @@ def test(
             return None, total_time, result_circuit, initial_mapping
         case _:
             raise ValueError(f"Unknown tool: '{tool}'.")
-
-

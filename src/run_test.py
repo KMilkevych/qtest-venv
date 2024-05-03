@@ -160,13 +160,13 @@ if not everything_correct:
     exit(0)
 
 print("  ✓ Input and output circuits are equivalent.")
-avg_ham = (
+dist = (
     simulate(
         input_circuit,
         circuit,
         initial_mapping,
         args.platform,
-        10000,
+        100000,
         args.ancillaries,
     )
     if args.platform in ACCEPTED_PLATFORMS
@@ -181,12 +181,12 @@ print(f"Total time: {total_time:.03f}s")
 print(f"Depth: {depth}")
 print(f"CX-depth: {cx_depth}")
 print(f"Swap count: {swap_count}")
-if avg_ham != None:
-    print(f"Avg. Hamming distance: {avg_ham:.03f}")
+if dist != None:
+    print(f"Hellinger distance: {dist:.03f}")
 else:
-    print("Avg. Hamming distance: N/A")
+    print("hellinger distance: N/A")
 
-result = (solver_time, total_time, depth, cx_depth, swap_count, avg_ham)
+result = (solver_time, total_time, depth, cx_depth, swap_count, dist)
 output_csv(
     args.tool,
     args.cx_optimal,

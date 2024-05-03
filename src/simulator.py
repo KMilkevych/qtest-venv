@@ -5,7 +5,8 @@ from qiskit_aer.noise import NoiseModel, QuantumError
 from qiskit.circuit.library import IGate, XGate, YGate, ZGate
 from qiskit.quantum_info.operators.channel import Kraus
 from qiskit.circuit.library.generalized_gates import PauliGate, UnitaryGate
-from avg_noise_models import AVG_TENERIFE, AVG_CAMBRIDGE, AVG_TOKYO
+from qiskit.quantum_info import hellinger_distance
+from avg_noise_models import AVG_TENERIFE, AVG_CAMBRIDGE, AVG_TOKYO, AVG_GUADALUPE
 from qiskit.circuit import Reset
 from numpy import array_equal
 
@@ -16,7 +17,7 @@ from circuits import (
     with_swaps_as_cnots,
 )
 
-ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge"]
+ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge", "guadalupe"]
 
 
 def average_noise_model(
@@ -243,6 +244,8 @@ def simulate_single(
             noise_model = NoiseModel.from_dict(AVG_TOKYO)
         case "cambridge":
             noise_model = NoiseModel.from_dict(AVG_CAMBRIDGE)
+        case "guadalupe":
+            noise_model = NoiseModel.from_dict(AVG_GUADALUPE)
         case _:
             print(f"Error: Platform '{platform}' not supported.")
             exit(1)
@@ -256,13 +259,14 @@ def simulate_single(
                 return None
 
     if final_mapping == None:
-        circuit.measure_active()
+        circuit.measure_all()
     else:
         circuit.barrier()
         register_size = len(final_mapping.keys())
         classical_register = ClassicalRegister(size=register_size, name="measure")
         circuit.add_register(classical_register)
-        for q, p in final_mapping.items():
+        sorted_final_mapping = sorted(final_mapping.items(), key=lambda x: x[0].id)
+        for q, p in sorted_final_mapping:
             circuit.measure(p.id, q.id)
 
     # Perform a noise simulation
@@ -272,42 +276,6 @@ def simulate_single(
     counts = result.get_counts(0)
 
     return counts  # type: ignore
-
-
-def hamming_dist(bools1: str, bools2: str) -> int:
-    dist = 0
-    for i in range(len(bools1)):
-        if bools1[i] != bools2[i]:
-            dist += 1
-    return dist
-
-
-def process_counts(
-    control_counts: dict[str, int],
-    noise_counts: dict[str, int],
-) -> dict[int, int]:
-    """
-    Given two dictionaries of counts, return the number of measurements with each Hamming distance.
-
-    Args
-    ----
-    - control_counts (`dict[str, int]`): The counts of the control circuit.
-    - noise_counts (`dict[str, int]`): The counts of the noise circuit.
-
-    Returns
-    --------
-    - `float`: A dict with the counts for each Hamming distance.
-    """
-
-    results: dict[int, int] = {}
-    for measurement, count in noise_counts.items():
-        min_ham = min([hamming_dist(key, measurement) for key in control_counts.keys()])
-        if min_ham in results.keys():
-            results[min_ham] += count
-        else:
-            results[min_ham] = count
-
-    return results
 
 
 def simulate(
@@ -332,7 +300,7 @@ def simulate(
 
     Returns
     --------
-    - `float`: Average Hamming distance.
+    - `float`: Hellinger Distance.
     """
 
     logical_circuit_counts = simulate_single(
@@ -357,12 +325,4 @@ def simulate(
     if logical_circuit_counts == None or synthesized_circuit_counts == None:
         return None
 
-    ham_results = process_counts(logical_circuit_counts, synthesized_circuit_counts)
-    avg_ham = sum(
-        [
-            float(ham) * (float(count) / float(shots))
-            for ham, count in ham_results.items()
-        ]
-    )
-
-    return avg_ham
+    return hellinger_distance(logical_circuit_counts, synthesized_circuit_counts)

@@ -128,14 +128,17 @@ def parse_olsq2_circuit(
             gates.append(("swap", qubits, time, sys.maxsize))
         else:
             parts = re.search(
-                r"Gate (\d+): (\w+) (.+) on (qubits|qubit) (.+) at time (\d+)", line
+                r"Gate (\d+): (\w+)(\(.+\))? (.+) on (qubits|qubit) (.+) at time (\d+)", line
             )
             if parts is None:
                 raise ValueError(f"Could not parse gate line: {line}")
             gate_id = int(parts.group(1))
             gate_name = parts.group(2)
-            qubits = list(map(int, parts.group(5).split(" and ")))
-            time = int(parts.group(6))
+            extra_name = parts.group(3)
+            if extra_name:
+                gate_name = f"{gate_name}_{extra_name[1:-1]}"
+            qubits = list(map(int, parts.group(6).split(" and ")))
+            time = int(parts.group(7))
             gates.append((gate_name, qubits, time, gate_id))
 
     gates = sorted(gates, key=lambda x: (x[2], x[3]))

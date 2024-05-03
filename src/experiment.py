@@ -335,15 +335,6 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
         # + VQE_EXPERIMENTS_TRANSPILED
         # + QUEKO_EXPERIMENTS
     ):
-        if tool == "sabre" or tool == "qt-gl":
-            if platform != "guadalupe":
-                continue
-        if tool == "qt-cd":
-            if benchmark.startswith("vqe"):
-                pass
-            else:
-                if platform != "cambridge" and platform != "guadalupe":
-                    continue
 
         match tool:
             case "sabre":

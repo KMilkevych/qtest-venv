@@ -104,6 +104,10 @@ def get_stats(circuit: QuantumCircuit):
     return depth, cx_depth, swap_count
 
 
+def str_to_float_str(input: str) -> str:
+    result = str(float(eval(input.replace("pi", str(math.pi)))))
+    return result
+
 def parse_olsq2_circuit(
     path: str, platform_depth: int, gate_lines: list[str]
 ) -> tuple[QuantumCircuit, InitialMapping]:
@@ -138,7 +142,7 @@ def parse_olsq2_circuit(
             if extra_name:
                 paren_removed = extra_name[1:-1]
                 if "," in paren_removed:
-                    args = paren_removed.split(',')
+                    args = [str_to_float_str(arg) for arg in paren_removed.split(',')]
                     gate_name = f"{gate_name}_{'_'.join(args)}"
                 else:
                     gate_name = f"{gate_name}_{paren_removed}"
@@ -406,6 +410,8 @@ def reinsert_unary_gates(
     while not all(len(gates) == 0 for gates in original_gate_list.values()):
         # insert unary gates
         for line in range(original_circuit.num_qubits):
+            if line not in original_gate_list.keys():
+                continue
             unary_gates, rest = consume_line_until_binary_gate(original_gate_list[line])
             original_gate_list[line] = rest
             physical_line = mapping[line]

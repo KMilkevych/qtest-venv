@@ -136,7 +136,12 @@ def parse_olsq2_circuit(
             gate_name = parts.group(2)
             extra_name = parts.group(3)
             if extra_name:
-                gate_name = f"{gate_name}_{extra_name[1:-1]}"
+                paren_removed = extra_name[1:-1]
+                if "," in paren_removed:
+                    args = paren_removed.split(',')
+                    gate_name = f"{gate_name}_{'_'.join(args)}"
+                else:
+                    gate_name = f"{gate_name}_{paren_removed}"
             qubits = list(map(int, parts.group(6).split(" and ")))
             time = int(parts.group(7))
             gates.append((gate_name, qubits, time, gate_id))

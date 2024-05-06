@@ -1,6 +1,7 @@
 import argparse
 
 from qiskit import QuantumCircuit
+from qiskit.exceptions import QiskitError
 from check import check_qcec, connectivity_check, equality_check
 from circuits import (
     get_stats,
@@ -160,18 +161,21 @@ if not everything_correct:
     exit(0)
 
 print("  ✓ Input and output circuits are equivalent.")
-dist = (
-    simulate(
-        input_circuit,
-        circuit,
-        initial_mapping,
-        args.platform,
-        100000,
-        args.ancillaries,
+try:
+    dist = (
+        simulate(
+            input_circuit,
+            circuit,
+            initial_mapping,
+            args.platform,
+            100000,
+            args.ancillaries,
+        )
+        if args.platform in ACCEPTED_PLATFORMS
+        else None
     )
-    if args.platform in ACCEPTED_PLATFORMS
-    else None
-)
+except QiskitError:
+    dist = "OOM"
 
 if solver_time is not None:
     print(f"Solver time: {solver_time:.03f}s")
@@ -181,10 +185,13 @@ print(f"Total time: {total_time:.03f}s")
 print(f"Depth: {depth}")
 print(f"CX-depth: {cx_depth}")
 print(f"Swap count: {swap_count}")
-if dist != None:
-    print(f"Hellinger distance: {dist:.03f}")
-else:
-    print("hellinger distance: N/A")
+match dist:
+    case "OOM":
+        print("Hellinger distance: Out of memory in simulation")
+    case None:
+        print("Hellinger distance: N/A")
+    case _:
+        print(f"Hellinger distance: {dist:.03f}")
 
 result = (solver_time, total_time, depth, cx_depth, swap_count, dist)
 output_csv(

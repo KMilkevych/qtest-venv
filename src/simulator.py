@@ -15,6 +15,7 @@ from circuits import (
     PhysicalQubit,
     make_final_mapping,
     with_swaps_as_cnots,
+    fill_holes_with_id_gates,
 )
 
 ACCEPTED_PLATFORMS = ["tokyo", "tenerife", "cambridge", "guadalupe"]
@@ -250,28 +251,30 @@ def simulate_single(
             print(f"Error: Platform '{platform}' not supported.")
             exit(1)
 
+    circuit_with_id_gates = fill_holes_with_id_gates(circuit)
+
     if not with_noise:
         noise_model = None
 
     if noise_model != None:
-        for instr in circuit.data:
+        for instr in circuit_with_id_gates.data:
             if instr.operation.name not in noise_model.basis_gates:
                 return None
 
     if final_mapping == None:
-        circuit.measure_all()
+        circuit_with_id_gates.measure_all()
     else:
-        circuit.barrier()
+        circuit_with_id_gates.barrier()
         register_size = len(final_mapping.keys())
         classical_register = ClassicalRegister(size=register_size, name="measure")
-        circuit.add_register(classical_register)
+        circuit_with_id_gates.add_register(classical_register)
         sorted_final_mapping = sorted(final_mapping.items(), key=lambda x: x[0].id)
         for q, p in sorted_final_mapping:
-            circuit.measure(p.id, q.id)
+            circuit_with_id_gates.measure(p.id, q.id)
 
     # Perform a noise simulation
-    backend = AerSimulator(noise_model=noise_model)
-    result = backend.run(circuit, shots=shots).result()
+    backend = AerSimulator(noise_model=noise_model, method="density_matrix")
+    result = backend.run(circuit_with_id_gates, shots=shots).result()
 
     counts = result.get_counts(0)
 

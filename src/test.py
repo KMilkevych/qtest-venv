@@ -51,7 +51,9 @@ def output_csv(
     anc: bool,
     input: str,
     platform: str,
-    result: tuple[float | None, float, int, int, int, float | None] | str,
+    result: (
+        tuple[float | None, float, int, int, int, float | None | Literal["OOM"]] | str
+    ),
 ):
     line = f"{tool};{cx_opt};{swap_opt};{anc};{input};{platform};"
     if isinstance(result, str):
@@ -69,7 +71,9 @@ def output_csv(
         else:
             line += f"{solver_time:.3f};"
         line += f"{total_time:.3f};{depth};{cx_depth};{swaps};"
-        if avg_ham != None:
+        if avg_ham == "OOM":
+            line += f"OOM"
+        elif avg_ham != None:
             line += f"{avg_ham:.3f}"
     with open(CSV_OUTPUT_FILE, "a") as f:
         f.write(line + "\n")

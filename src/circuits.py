@@ -631,11 +631,19 @@ def fill_holes_with_id_gates(circuit: QuantumCircuit) -> QuantumCircuit:
     """
     Fill holes in the circuit with identity gates.
     """
+    idle_qubits_dict = {q: True for q in range(circuit.num_qubits)}
+    for instr in circuit.data:
+        for q in instr[1]:
+            idle_qubits_dict[q._index] = False
+    idle_qubits = {q for q in idle_qubits_dict if idle_qubits_dict[q]}
+
     num_qubits = circuit.num_qubits
     qubit_name = circuit.qregs[0].name
     new_circuit = QuantumCircuit(QuantumRegister(num_qubits, qubit_name))
     circuit_dag = circuit_to_dag(circuit)
     layers = circuit_dag.layers()
+    all_qubits = set(range(num_qubits)) - idle_qubits
+
     for layer in layers:
         graph = layer["graph"]
         nodes = graph.nodes()
@@ -645,7 +653,7 @@ def fill_holes_with_id_gates(circuit: QuantumCircuit) -> QuantumCircuit:
             if isinstance(node, DAGOpNode)
         ]
         occupied_qubits = {q._index for instr in instrs for q in instr[1]}
-        unoccupied_qubits = set(range(num_qubits)) - occupied_qubits
+        unoccupied_qubits = all_qubits - occupied_qubits
         for q in unoccupied_qubits:
             new_circuit.id(q)
         for instr in instrs:

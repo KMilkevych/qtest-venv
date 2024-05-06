@@ -144,6 +144,8 @@ def parse_olsq2_circuit(
                 if "," in paren_removed:
                     args = [str_to_float_str(arg) for arg in paren_removed.split(',')]
                     gate_name = f"{gate_name}_{'_'.join(args)}"
+                elif "pi" in paren_removed:
+                    gate_name = f"{gate_name}_{str_to_float_str(paren_removed)}"
                 else:
                     gate_name = f"{gate_name}_{paren_removed}"
             qubits = list(map(int, parts.group(6).split(" and ")))

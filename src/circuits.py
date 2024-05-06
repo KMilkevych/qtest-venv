@@ -7,6 +7,8 @@ import sys
 from typing import Any
 from qiskit import QuantumCircuit, QuantumRegister, qasm2
 from qiskit.circuit import Qubit, Instruction, CircuitInstruction
+from qiskit.dagcircuit import DAGOpNode
+from qiskit.converters import circuit_to_dag, dag_to_circuit
 
 
 class LogicalQubit:
@@ -108,6 +110,7 @@ def str_to_float_str(input: str) -> str:
     result = str(float(eval(input.replace("pi", str(math.pi)))))
     return result
 
+
 def parse_olsq2_circuit(
     path: str, platform_depth: int, gate_lines: list[str]
 ) -> tuple[QuantumCircuit, InitialMapping]:
@@ -132,7 +135,8 @@ def parse_olsq2_circuit(
             gates.append(("swap", qubits, time, sys.maxsize))
         else:
             parts = re.search(
-                r"Gate (\d+): (\w+)(\(.+\))? (.+) on (qubits|qubit) (.+) at time (\d+)", line
+                r"Gate (\d+): (\w+)(\(.+\))? (.+) on (qubits|qubit) (.+) at time (\d+)",
+                line,
             )
             if parts is None:
                 raise ValueError(f"Could not parse gate line: {line}")
@@ -142,7 +146,7 @@ def parse_olsq2_circuit(
             if extra_name:
                 paren_removed = extra_name[1:-1]
                 if "," in paren_removed:
-                    args = [str_to_float_str(arg) for arg in paren_removed.split(',')]
+                    args = [str_to_float_str(arg) for arg in paren_removed.split(",")]
                     gate_name = f"{gate_name}_{'_'.join(args)}"
                 elif "pi" in paren_removed:
                     gate_name = f"{gate_name}_{str_to_float_str(paren_removed)}"
@@ -621,3 +625,30 @@ def make_final_mapping(
 
     final_mapping = {q: p for p, q in reverse_mapping.items()}
     return final_mapping
+
+
+def fill_holes_with_id_gates(circuit: QuantumCircuit) -> QuantumCircuit:
+    """
+    Fill holes in the circuit with identity gates.
+    """
+    num_qubits = circuit.num_qubits
+    qubit_name = circuit.qregs[0].name
+    new_circuit = QuantumCircuit(QuantumRegister(num_qubits, qubit_name))
+    circuit_dag = circuit_to_dag(circuit)
+    layers = circuit_dag.layers()
+    for layer in layers:
+        graph = layer["graph"]
+        nodes = graph.nodes()
+        instrs = [
+            (node.op, node.qargs, node.cargs)
+            for node in nodes
+            if isinstance(node, DAGOpNode)
+        ]
+        occupied_qubits = {q._index for instr in instrs for q in instr[1]}
+        unoccupied_qubits = set(range(num_qubits)) - occupied_qubits
+        for q in unoccupied_qubits:
+            new_circuit.id(q)
+        for instr in instrs:
+            new_circuit.append(instr[0], instr[1], instr[2])
+
+    return new_circuit

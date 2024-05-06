@@ -241,12 +241,16 @@ def simulate_single(
     match platform:
         case "tenerife":
             noise_model = NoiseModel.from_dict(AVG_TENERIFE)
+            noise_model._basis_gates = {"cx", "id", "u1", "u2", "u3"}
         case "tokyo":
             noise_model = NoiseModel.from_dict(AVG_TOKYO)
+            noise_model._basis_gates = {"cx", "id", "u1", "u2", "u3"}
         case "cambridge":
             noise_model = NoiseModel.from_dict(AVG_CAMBRIDGE)
+            noise_model._basis_gates = {"cx", "id", "u1", "u2", "u3"}
         case "guadalupe":
             noise_model = NoiseModel.from_dict(AVG_GUADALUPE)
+            noise_model._basis_gates = {"cx", "id", "reset", "rz", "sx", "x"}
         case _:
             print(f"Error: Platform '{platform}' not supported.")
             exit(1)

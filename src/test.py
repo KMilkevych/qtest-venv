@@ -1,4 +1,5 @@
 import os
+import signal
 import subprocess
 import time
 from typing import Literal
@@ -31,9 +32,19 @@ def run(command: str, path: str, time_limit: int):
     """
     # print(f"Running '{command}' in '{path}'")
     command_string = f"cd {path}; source .venv/bin/activate; {command}"
-    return subprocess.check_output(
-        f'/bin/bash -c "{command_string} 2> /dev/null"', shell=True, timeout=time_limit
-    ).decode("utf-8")
+    try:
+        process = subprocess.Popen(
+            f'/bin/bash -c "{command_string} 2> /dev/null"',
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            preexec_fn=os.setsid,
+        )
+        output, _ = process.communicate(timeout=time_limit)
+        return output.decode("utf-8")
+    except subprocess.TimeoutExpired:
+        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        raise subprocess.TimeoutExpired(command, time_limit)
 
 
 CSV_OUTPUT_FILE = "tmp/output.csv"

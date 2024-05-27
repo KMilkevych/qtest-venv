@@ -365,8 +365,8 @@ def test(
                 raise ValueError("SABRE always looks at CX-only circuits.")
             if not swap_optimal:
                 raise ValueError("SABRE always tries to optimize SWAPs.")
-            if not ancillaries:
-                raise ValueError("SABRE always uses ancillary SWAPs.")
+            if ancillaries:
+                raise ValueError("SABRE never uses ancillary SWAPs.")
             coupling_map = PLATFORMS[platform][1]
             circuit = QuantumCircuit.from_qasm_file(input)
             sabre = SabreLayout(CouplingMap(coupling_map), swap_trials=8, seed=0)

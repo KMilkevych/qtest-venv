@@ -50,7 +50,7 @@ def run(command: str, path: str, time_limit: int):
 CSV_OUTPUT_FILE = "tmp/output.csv"
 if not os.path.exists(CSV_OUTPUT_FILE):
     os.makedirs(os.path.dirname(CSV_OUTPUT_FILE), exist_ok=True)
-    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Hellinger distance"
+    line = f"Tool;CX optimal;SWAP optimal;Ancillaries;Input;Platform;Solver time (s);Total time (s);Depth;CX depth;SWAPs;Average Hellinger distance;Best Hellinger distance;Worst Hellinger distance;Median Hellinger distance"
     with open(CSV_OUTPUT_FILE, "a") as f:
         f.write(line + "\n")
 
@@ -63,12 +63,23 @@ def output_csv(
     input: str,
     platform: str,
     result: (
-        tuple[float | None, float, int, int, int, float | None | Literal["OOM"]] | str
+        tuple[
+            float | None,
+            float,
+            int,
+            int,
+            int,
+            float | None | Literal["OOM"],
+            float | None | Literal["OOM"],
+            float | None | Literal["OOM"],
+            float | None | Literal["OOM"],
+        ]
+        | str
     ),
 ):
     line = f"{tool};{cx_opt};{swap_opt};{anc};{input};{platform};"
     if isinstance(result, str):
-        line += f";{result};;;;;"
+        line += f";{result};;;;;;;"
     else:
         solver_time = result[0]
         total_time = result[1]
@@ -76,16 +87,26 @@ def output_csv(
         cx_depth = result[3]
         swaps = result[4]
         avg_ham = result[5]
+        best_ham = result[6]
+        worst_ham = result[7]
+        median_ham = result[8]
 
         if solver_time == None:
             line += f";"
         else:
             line += f"{solver_time:.3f};"
         line += f"{total_time:.3f};{depth};{cx_depth};{swaps};"
-        if avg_ham == "OOM":
-            line += f"OOM"
-        elif avg_ham != None:
-            line += f"{avg_ham:.3f}"
+        for dist in [avg_ham, best_ham, worst_ham, median_ham]:
+            if dist == "OOM":
+                line += f"OOM;"
+            elif dist == None:
+                line += f";"
+            else:
+                line += f"{dist:.3f};"
+
+        # cut off the last semicolon
+        line = line[:-1]
+
     with open(CSV_OUTPUT_FILE, "a") as f:
         f.write(line + "\n")
 
@@ -365,8 +386,8 @@ def test(
                 raise ValueError("SABRE always looks at CX-only circuits.")
             if not swap_optimal:
                 raise ValueError("SABRE always tries to optimize SWAPs.")
-            if not ancillaries:
-                raise ValueError("SABRE always uses ancillary SWAPs.")
+            if ancillaries:
+                raise ValueError("SABRE never uses ancillary SWAPs.")
             coupling_map = PLATFORMS[platform][1]
             circuit = QuantumCircuit.from_qasm_file(input)
             sabre = SabreLayout(CouplingMap(coupling_map), swap_trials=8, seed=0)

@@ -1,6 +1,8 @@
 import argparse
+import os
 
 from qiskit import QuantumCircuit
+from qiskit.qasm3 import dumps
 from qiskit.exceptions import QiskitError
 from check import check_qcec, connectivity_check, equality_check
 from circuits import (
@@ -161,21 +163,36 @@ if not everything_correct:
     exit(0)
 
 print("  ✓ Input and output circuits are equivalent.")
+
+# Output circuit to qasm file
+folder_exists = os.path.exists("output_circuits")
+if not folder_exists:
+    os.makedirs("output_circuits")
+
+circuit_name = args.input.split("/")[-1].split(".")[0]
+output_circuit_path = f"output_circuits/{args.tool}_{circuit_name}_{args.platform}{"_cxopt" if args.cx_optimal else ""}{"_swapopt" if args.swap_optimal else ""}{'_anc' if args.ancillaries else ''}.qasm"
+output_circuit_qasm = dumps(circuit)
+with open(output_circuit_path, "w") as f:
+    f.write(output_circuit_qasm)
+    f.write("\n")
+    for l, p in initial_mapping.items():
+        f.write(f"// {l} -> {p}\n")
+
+
 try:
-    dist = (
-        simulate(
+    if args.platform in ACCEPTED_PLATFORMS:
+        avg_dist, best_dist, worst_dist, median_dist = simulate(
             input_circuit,
             circuit,
             initial_mapping,
             args.platform,
             100000,
-            args.ancillaries,
+            synthesized_with_anicillaries=args.ancillaries,
         )
-        if args.platform in ACCEPTED_PLATFORMS
-        else None
-    )
+    else:
+        avg_dist, best_dist, worst_dist, median_dist = None, None, None, None
 except QiskitError:
-    dist = "OOM"
+    avg_dist, best_dist, worst_dist, median_dist = "OOM", "OOM", "OOM", "OOM"
 
 if solver_time is not None:
     print(f"Solver time: {solver_time:.03f}s")
@@ -185,15 +202,22 @@ print(f"Total time: {total_time:.03f}s")
 print(f"Depth: {depth}")
 print(f"CX-depth: {cx_depth}")
 print(f"Swap count: {swap_count}")
-match dist:
-    case "OOM":
-        print("Hellinger distance: Out of memory in simulation")
-    case None:
-        print("Hellinger distance: N/A")
-    case _:
-        print(f"Hellinger distance: {dist:.03f}")
 
-result = (solver_time, total_time, depth, cx_depth, swap_count, dist)
+def print_dist(name, dist):
+    match dist:
+        case "OOM":
+            print(f"{name} Hellinger distance: Out of memory in simulation")
+        case None:
+            print(f"{name} Hellinger distance: N/A")
+        case _:
+            print(f"{name} Hellinger distance: {dist:.03f}")
+
+print_dist("Average", avg_dist)
+print_dist("Best", best_dist)
+print_dist("Worst", worst_dist)
+print_dist("Median", median_dist)
+
+result = (solver_time, total_time, depth, cx_depth, swap_count, avg_dist, best_dist, worst_dist, median_dist)
 output_csv(
     args.tool,
     args.cx_optimal,

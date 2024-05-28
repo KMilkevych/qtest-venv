@@ -2,7 +2,7 @@ from qiskit import QuantumCircuit
 from check import check_qcec, connectivity_check, equality_check
 from circuits import get_stats
 from platforms import PLATFORMS
-from simulator import ACCEPTED_PLATFORMS, simulate
+from simulator import simulate
 from test import output_csv, test
 
 EXPERIMENTS = [
@@ -327,13 +327,13 @@ QUEKO_EXPERIMENTS = [
 
 time_limit = 7200
 
-for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
+for tool in ["sabre", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
     for benchmark, platform in (
         EXPERIMENTS
-        # + EXPERIMENTS_TRANSPILED
+        + EXPERIMENTS_TRANSPILED
         + VQE_EXPERIMENTS
-        # + VQE_EXPERIMENTS_TRANSPILED
-        # + QUEKO_EXPERIMENTS
+        + VQE_EXPERIMENTS_TRANSPILED
+        + QUEKO_EXPERIMENTS
     ):
 
         match tool:
@@ -343,20 +343,16 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
                 configurations = [(True, True, True)]
             case tool_name if tool_name.endswith("olsq2"):
                 configurations = [
-                    (False, False, True),
+                    #(False, False, True),
                     (False, True, True),
-                    (True, False, True),
+                    #(True, False, True),
                     (True, True, True),
                 ]
             case tool_name if tool_name.startswith("qt"):
                 configurations = [
-                    # (False, False, False),
-                    (False, False, True),
-                    # (False, True, False),
+                    #(False, False, True),
                     (False, True, True),
-                    # (True, False, False),
-                    (True, False, True),
-                    # (True, True, False),
+                    #(True, False, True),
                     (True, True, True),
                 ]
             case _:
@@ -438,17 +434,15 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
                 )
                 continue
             print("  ✓ Input and output circuits are equivalent.")
-            avg_ham = (
+            hellinger_dists = (
                 simulate(
                     input_circuit,
                     circuit,
                     initial_mapping,
                     platform,
-                    10000,
+                    100000,
                     anc,
                 )
-                if platform in ACCEPTED_PLATFORMS
-                else None
             )
 
             result = (
@@ -457,7 +451,10 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
                 depth,
                 cx_depth,
                 swap_count,
-                avg_ham,
+                hellinger_dists[0],
+                hellinger_dists[1],
+                hellinger_dists[2],
+                hellinger_dists[3],
             )
             output_csv(
                 tool,
@@ -468,7 +465,7 @@ for tool in ["sabre", "qt-gl", "qt-cd", "q-synth", "tb-olsq2", "olsq2"]:
                 platform,
                 result,
             )
-            ham_str = f", Hellinger distance: {avg_ham}"
+            hel_dist_str = f", Hellinger distances: {hellinger_dists}"
             print(
-                f"Time: {total_time:.03f}s, depth: {depth}, CX depth: {cx_depth}, SWAPs: {swap_count}{ham_str if avg_ham != None else ''}"
+                f"Time: {total_time:.03f}s, depth: {depth}, CX depth: {cx_depth}, SWAPs: {swap_count}{hel_dist_str if hellinger_dists[0] != None else ''}"
             )

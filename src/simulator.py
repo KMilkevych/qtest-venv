@@ -9,6 +9,7 @@ from qiskit.quantum_info import hellinger_distance
 from avg_noise_models import AVG_TENERIFE, AVG_CAMBRIDGE, AVG_TOKYO, AVG_GUADALUPE
 from qiskit.circuit import Reset
 from numpy import array_equal
+from qiskit.visualization import plot_histogram
 
 from circuits import (
     LogicalQubit,
@@ -310,13 +311,6 @@ def simulate(
     - `float`: Hellinger Distance.
     """
 
-    logical_circuit_counts = simulate_single(
-        logical_circuit,
-        platform,
-        shots,
-        with_noise=False,
-    )
-
     synthesized_final_mapping = make_final_mapping(
         synthesized_circuit, synthesized_initial_mapping, synthesized_with_anicillaries
     )
@@ -328,8 +322,16 @@ def simulate(
         with_noise=True,
         final_mapping=synthesized_final_mapping,
     )
+    if synthesized_circuit_counts == None:
+        return None
 
-    if logical_circuit_counts == None or synthesized_circuit_counts == None:
+    logical_circuit_counts = simulate_single(
+        logical_circuit,
+        platform,
+        shots,
+        with_noise=False,
+    )
+    if logical_circuit_counts == None:
         return None
 
     return hellinger_distance(logical_circuit_counts, synthesized_circuit_counts)

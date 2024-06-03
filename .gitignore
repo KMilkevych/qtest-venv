@@ -1,4 +1,4 @@
 tmp
 intermediate-files
-src/__pycache__
 output_circuits
+__pycache__

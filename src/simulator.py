@@ -243,48 +243,33 @@ def average_noise_model(
     return average_noise_model
 
 
-def best_noise_model(
-    noise_model: NoiseModel, num_of_qubits: int, num_of_edges_in_coupling_map: int
-):
+def best_noise_model(noise_model: NoiseModel):
     original_errors: list[dict[str, Any]] = noise_model.to_dict()["errors"]
 
     original_readout_errors = [
         error for error in original_errors if error["type"] == "roerror"
     ]
+    original_gate_errors = [
+        error for error in original_errors if error["type"] == "qerror"
+    ]
 
     best_noise_model = NoiseModel([instr for instr in noise_model.basis_gates])
 
-    groups = get_instr_groups(noise_model)
+    op_to_best_line = {}
+    for error in original_gate_errors:
+        instructions = error["instructions"]
+        probabilities = error["probabilities"]
+        instr_with_prob = list(zip(instructions, probabilities, strict=True))
+        prob_of_id = max(probabilities)
 
-    op_to_instr_prob = {}
-    for group in groups:
-        instr = group[0][0]
-        ops = group[0][1]
-        if len(ops) > 1:
-            raise ValueError("Multiple operations in a group")
-        op = ops[0]
+        operation = error["operations"][0]
+        if operation not in op_to_best_line:
+            op_to_best_line[operation] = (prob_of_id, instr_with_prob)
+        elif prob_of_id > op_to_best_line[operation][0]:
+            op_to_best_line[operation] = (prob_of_id, instr_with_prob)
 
-        probs = [member[2] for member in group]
-
-        instr_has_1_part = len(instr) == 1
-        instr_is_id = instr[0]["name"] == "id"
-        instr_is_pauli_id = (
-            instr[0]["name"] == "pauli" and instr[0]["params"][0] == "II"
-        )
-
-        if instr_has_1_part and (instr_is_id or instr_is_pauli_id):
-            best_prob = max(probs)
-        elif op == "cx":
-            best_prob = sum(probs) / num_of_edges_in_coupling_map
-        else:
-            best_prob = sum(probs) / num_of_qubits
-
-        if op not in op_to_instr_prob:
-            op_to_instr_prob[op] = [(instr, best_prob)]
-        else:
-            op_to_instr_prob[op].append((instr, best_prob))
-
-    for op, instr_prob in op_to_instr_prob.items():
+    for op, best_line in op_to_best_line.items():
+        instr_prob = best_line[1]
         noise_ops = []
         for instr, prob in instr_prob:
             noise_elem = []
@@ -316,28 +301,7 @@ def best_noise_model(
 
             noise_ops.append((noise_elem, prob))
 
-        # Normalization
-        is_id = lambda gate: isinstance(gate, IGate)
-        is_pauli_id = (
-            lambda gate: isinstance(gate, PauliGate) and gate.params[0] == "II"
-        )
-
-        id_ops = [
-            (gate, prob) for gate, prob in noise_ops if is_id(gate) or is_pauli_id(gate)
-        ]
-        noise_ops = [
-            (gate, prob)
-            for gate, prob in noise_ops
-            if not is_id(gate) and not is_pauli_id(gate)
-        ]
-
-        id_prob = sum([prob for _, prob in id_ops])
-        noise_prob = sum([prob for _, prob in noise_ops])
-        noise_ops_normalized = [
-            (gate, prob * (1 - id_prob) / noise_prob) for gate, prob in noise_ops
-        ]
-
-        error = QuantumError(id_ops + noise_ops_normalized)
+        error = QuantumError(noise_ops)
         best_noise_model.add_all_qubit_quantum_error(error, [op])
 
     # READOUT ERROR
@@ -354,48 +318,33 @@ def best_noise_model(
     return best_noise_model
 
 
-def worst_noise_model(
-    noise_model: NoiseModel, num_of_qubits: int, num_of_edges_in_coupling_map: int
-):
+def worst_noise_model(noise_model: NoiseModel):
     original_errors: list[dict[str, Any]] = noise_model.to_dict()["errors"]
 
     original_readout_errors = [
         error for error in original_errors if error["type"] == "roerror"
     ]
+    original_gate_errors = [
+        error for error in original_errors if error["type"] == "qerror"
+    ]
 
     worst_noise_model = NoiseModel([instr for instr in noise_model.basis_gates])
 
-    groups = get_instr_groups(noise_model)
+    op_to_worst_line = {}
+    for error in original_gate_errors:
+        instructions = error["instructions"]
+        probabilities = error["probabilities"]
+        instr_with_prob = list(zip(instructions, probabilities, strict=True))
+        prob_of_id = max(probabilities)
 
-    op_to_instr_prob = {}
-    for group in groups:
-        instr = group[0][0]
-        ops = group[0][1]
-        if len(ops) > 1:
-            raise ValueError("Multiple operations in a group")
-        op = ops[0]
+        operation = error["operations"][0]
+        if operation not in op_to_worst_line:
+            op_to_worst_line[operation] = (prob_of_id, instr_with_prob)
+        elif prob_of_id < op_to_worst_line[operation][0]:
+            op_to_worst_line[operation] = (prob_of_id, instr_with_prob)
 
-        probs = [member[2] for member in group]
-
-        instr_has_1_part = len(instr) == 1
-        instr_is_id = instr[0]["name"] == "id"
-        instr_is_pauli_id = (
-            instr[0]["name"] == "pauli" and instr[0]["params"][0] == "II"
-        )
-
-        if instr_has_1_part and (instr_is_id or instr_is_pauli_id):
-            worst_prob = min(probs)
-        elif op == "cx":
-            worst_prob = sum(probs) / num_of_edges_in_coupling_map
-        else:
-            worst_prob = sum(probs) / num_of_qubits
-
-        if op not in op_to_instr_prob:
-            op_to_instr_prob[op] = [(instr, worst_prob)]
-        else:
-            op_to_instr_prob[op].append((instr, worst_prob))
-
-    for op, instr_prob in op_to_instr_prob.items():
+    for op, worst_line in op_to_worst_line.items():
+        instr_prob = worst_line[1]
         noise_ops = []
         for instr, prob in instr_prob:
             noise_elem = []
@@ -427,28 +376,7 @@ def worst_noise_model(
 
             noise_ops.append((noise_elem, prob))
 
-        # Normalization
-        is_id = lambda gate: isinstance(gate, IGate)
-        is_pauli_id = (
-            lambda gate: isinstance(gate, PauliGate) and gate.params[0] == "II"
-        )
-
-        id_ops = [
-            (gate, prob) for gate, prob in noise_ops if is_id(gate) or is_pauli_id(gate)
-        ]
-        noise_ops = [
-            (gate, prob)
-            for gate, prob in noise_ops
-            if not is_id(gate) and not is_pauli_id(gate)
-        ]
-
-        id_prob = sum([prob for _, prob in id_ops])
-        noise_prob = sum([prob for _, prob in noise_ops])
-        noise_ops_normalized = [
-            (gate, prob * (1 - id_prob) / noise_prob) for gate, prob in noise_ops
-        ]
-
-        error = QuantumError(id_ops + noise_ops_normalized)
+        error = QuantumError(noise_ops)
         worst_noise_model.add_all_qubit_quantum_error(error, [op])
 
     # READOUT ERROR
@@ -465,50 +393,39 @@ def worst_noise_model(
     return worst_noise_model
 
 
-def median_noise_model(
-    noise_model: NoiseModel, num_of_qubits: int, num_of_edges_in_coupling_map: int
-):
+def median_noise_model(noise_model: NoiseModel):
     original_errors: list[dict[str, Any]] = noise_model.to_dict()["errors"]
 
     original_readout_errors = [
         error for error in original_errors if error["type"] == "roerror"
     ]
+    original_gate_errors = [
+        error for error in original_errors if error["type"] == "qerror"
+    ]
 
     median_noise_model = NoiseModel([instr for instr in noise_model.basis_gates])
 
-    groups = get_instr_groups(noise_model)
+    op_to_median_line = {}
+    for error in original_gate_errors:
+        instructions = error["instructions"]
+        probabilities = error["probabilities"]
+        instr_with_prob = list(zip(instructions, probabilities, strict=True))
+        prob_of_id = max(probabilities)
 
-    op_to_instr_prob = {}
-    for group in groups:
-        instr = group[0][0]
-        ops = group[0][1]
-        if len(ops) > 1:
-            raise ValueError("Multiple operations in a group")
-        op = ops[0]
-
-        probs = [member[2] for member in group]
-
-        instr_has_1_part = len(instr) == 1
-        instr_is_id = instr[0]["name"] == "id"
-        instr_is_pauli_id = (
-            instr[0]["name"] == "pauli" and instr[0]["params"][0] == "II"
-        )
-
-        if instr_has_1_part and (instr_is_id or instr_is_pauli_id):
-            num_of_probs = len(probs)
-            middle_index = num_of_probs // 2
-            median_prob = sorted(probs)[middle_index]
-        elif op == "cx":
-            median_prob = sum(probs) / num_of_edges_in_coupling_map
+        operation = error["operations"][0]
+        if operation not in op_to_median_line:
+            op_to_median_line[operation] = [(prob_of_id, instr_with_prob)]
         else:
-            median_prob = sum(probs) / num_of_qubits
+            op_to_median_line[operation].append((prob_of_id, instr_with_prob))
 
-        if op not in op_to_instr_prob:
-            op_to_instr_prob[op] = [(instr, median_prob)]
-        else:
-            op_to_instr_prob[op].append((instr, median_prob))
+    for op, median_line_list in op_to_median_line.items():
+        median_line_list.sort(key=lambda x: x[0])
+        middle_index = len(median_line_list) // 2
+        median_instr_prob = median_line_list[middle_index]
+        op_to_median_line[op] = median_instr_prob
 
-    for op, instr_prob in op_to_instr_prob.items():
+    for op, median_line_list in op_to_median_line.items():
+        instr_prob = median_line_list[1]
         noise_ops = []
         for instr, prob in instr_prob:
             noise_elem = []
@@ -540,28 +457,7 @@ def median_noise_model(
 
             noise_ops.append((noise_elem, prob))
 
-        # Normalization
-        is_id = lambda gate: isinstance(gate, IGate)
-        is_pauli_id = (
-            lambda gate: isinstance(gate, PauliGate) and gate.params[0] == "II"
-        )
-
-        id_ops = [
-            (gate, prob) for gate, prob in noise_ops if is_id(gate) or is_pauli_id(gate)
-        ]
-        noise_ops = [
-            (gate, prob)
-            for gate, prob in noise_ops
-            if not is_id(gate) and not is_pauli_id(gate)
-        ]
-
-        id_prob = sum([prob for _, prob in id_ops])
-        noise_prob = sum([prob for _, prob in noise_ops])
-        noise_ops_normalized = [
-            (gate, prob * (1 - id_prob) / noise_prob) for gate, prob in noise_ops
-        ]
-
-        error = QuantumError(id_ops + noise_ops_normalized)
+        error = QuantumError(noise_ops)
         median_noise_model.add_all_qubit_quantum_error(error, [op])
 
     # READOUT ERROR

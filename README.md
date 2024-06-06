@@ -51,7 +51,7 @@ options:
 
 ## Sample run
 
-If you run one of the transpiled benchmarks in `qt`, `qtest` will also perform a noise simulation. It will perform noise simulation based on the noise models of IBM's quantum computers from the Qiskit package. Since the noise profiles vary a lot between qubits in the noise models, we use an averaged model. We also provide a "best" model (all qubits are modelled after the least noisy), a "worst" model and a "median" model.
+If you run one of the transpiled benchmarks in `qt`, `qtest` will also perform a noise simulation. It will perform noise simulation based on the noise models of IBM's quantum computers from the Qiskit package. Since the noise profiles vary a lot between qubits in the noise models, we use an averaged model. We also provide a "best" model (all qubits are modeled after the least noisy), a "worst" model and a "median" model.
 
 ```text
 $ ./test sabre qt/benchmarks/transpiled/tenerife/adder.qasm tenerife -swap -cx -anc

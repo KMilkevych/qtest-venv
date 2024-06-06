@@ -1,6 +1,6 @@
 # qtest
 
-> This tool was developed in relation a Master thesis at the Department of Computer Science by [Anders Benjamin Clausen](https://github.com/anbclausen) and [Anna Blume Jakobsen](https://github.com/AnnaBlume99). It is here to make our experimental setup public and is not intended to be used.
+> This tool was developed in relation a Master thesis at the Department of Computer Science, Aarhus University by [Anders Benjamin Clausen](https://github.com/anbclausen) and [Anna Blume Jakobsen](https://github.com/AnnaBlume99). It is here to make our experimental setup public and is not intended to be used.
 
 A tool for comparing and testing `qt` (QuilLS), `q-synth`, `olsq2`, `tb-olsq2` and `sabre`.
 

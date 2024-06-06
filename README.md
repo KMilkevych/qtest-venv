@@ -53,6 +53,8 @@ options:
 
 If you run one of the transpiled benchmarks in `qt`, `qtest` will also perform a noise simulation. It will perform noise simulation based on the noise models of IBM's quantum computers from the Qiskit package. Since the noise profiles vary a lot between qubits in the noise models, we use an averaged model. We also provide a "best" model (all qubits are modeled after the least noisy), a "worst" model and a "median" model.
 
+The Hellinger distance output describes the Hellinger distance between the output distribution of the noise simulation and the output distribution of an idealized noise-free simulation.
+
 ```text
 $ ./test sabre qt/benchmarks/transpiled/tenerife/adder.qasm tenerife -swap -cx -anc
 Running sabre on qt/benchmarks/transpiled/tenerife/adder.qasm on tenerife with time limit 600s

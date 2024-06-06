@@ -4,6 +4,8 @@ A tool for comparing and testing `qt`, `q-synth`, `olsq2`, `tb-olsq2` and `sabre
 
 > Note: Works only for UNIX systems.
 
+> Note: QuilLS was previously named qt.
+
 ## Usage
 
 ```text
@@ -46,13 +48,3 @@ poetry install
 cd ..
 poetry install
 ```
-
-## Updating the patch file
-
-Run in project root:
-
-```bash
-git --no-pager diff --no-color --submodule=diff > patch.diff 
-```
-
-Note: Remember to delete the old file before generating the new. Also remember to `git add` untracked files before running the command above.

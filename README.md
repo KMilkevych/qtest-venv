@@ -1,5 +1,7 @@
 # qtest
 
+> This tool was developed in relation a Master thesis at the Department of Computer Science by [Anders Benjamin Clausen](https://github.com/anbclausen) and [Anna Blume Jakobsen](https://github.com/AnnaBlume99). It is here to make our experimental setup public and is not intended to be used.
+
 A tool for comparing and testing `qt` (QuilLS), `q-synth`, `olsq2`, `tb-olsq2` and `sabre`.
 
 > Note: Works only for UNIX systems.
@@ -26,6 +28,12 @@ poetry install
 cd ..
 poetry install
 ```
+
+Note, `qtest` was designed to work with very specific versions of the tools. To get a setup that works downgrade:
+
+- `qt` to commit `253c0ae`
+- `Q-Synth` to commit `553d54c`
+- `OLSQ2` to commit `0ce4a6f`
 
 ## Usage
 

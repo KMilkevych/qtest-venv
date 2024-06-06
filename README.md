@@ -1,6 +1,6 @@
 # qtest
 
-A tool for comparing and testing `qt`, `q-synth`, `olsq2`, `tb-olsq2` and `sabre`.
+A tool for comparing and testing `qt` (QuilLS), `q-synth`, `olsq2`, `tb-olsq2` and `sabre`.
 
 > Note: Works only for UNIX systems.
 

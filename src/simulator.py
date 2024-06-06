@@ -544,7 +544,7 @@ def simulate_single(
                     noise_model = NoiseModel.from_dict(MEDIAN_GUADALUPE)
             noise_model._basis_gates = {"cx", "id", "reset", "rz", "sx", "x"}
         case _:
-            print(f"Error: Platform '{platform}' not supported.")
+            print(f"Cannot Simulate: Platform '{platform}' not supported.")
             exit(1)
 
     circuit_with_id_gates = fill_holes_with_id_gates(circuit)

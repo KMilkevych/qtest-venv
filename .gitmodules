@@ -1,6 +1,6 @@
 [submodule "qt"]
 	path = qt
-	url = https://github.com/anbclausen/qt.git
+	url = https://github.com/anbclausen/quills.git
 [submodule "Q-Synth"]
 	path = Q-Synth
 	url = https://github.com/irfansha/Q-Synth.git

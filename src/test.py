@@ -313,6 +313,8 @@ def test(
         case "tb-olsq2":
             if not ancillaries:
                 raise ValueError("TB-OLSQ2 always uses ancillary SWAPs.")
+            if not swap_optimal:
+                raise ValueError("TB-OLSQ2 always tries to optimize SWAPs.")
             if cx_optimal:
                 input_circuit = QuantumCircuit.from_qasm_file(input)
                 only_cx_circuit = remove_all_non_cx_gates(input_circuit)

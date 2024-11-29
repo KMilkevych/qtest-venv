@@ -169,14 +169,15 @@ folder_exists = os.path.exists("output_circuits")
 if not folder_exists:
     os.makedirs("output_circuits")
 
-circuit_name = args.input.split("/")[-1].split(".")[0]
-output_circuit_path = f"output_circuits/{args.tool}_{circuit_name}_{args.platform}{"_cxopt" if args.cx_optimal else ""}{"_swapopt" if args.swap_optimal else ""}{'_anc' if args.ancillaries else ''}.qasm"
-output_circuit_qasm = dumps(circuit)
-with open(output_circuit_path, "w") as f:
-    f.write(output_circuit_qasm)
-    f.write("\n")
-    for l, p in initial_mapping.items():
-        f.write(f"// {l} -> {p}\n")
+# TODO: Fix this
+# circuit_name = args.input.split("/")[-1].split(".")[0]
+# output_circuit_path = f"output_circuits/{args.tool}_{circuit_name}_{args.platform}{"_cxopt" if args.cx_optimal else ""}{"_swapopt" if args.swap_optimal else ""}{'_anc' if args.ancillaries else ''}.qasm"
+# output_circuit_qasm = dumps(circuit)
+# with open(output_circuit_path, "w") as f:
+#     f.write(output_circuit_qasm)
+#     f.write("\n")
+#     for l, p in initial_mapping.items():
+#         f.write(f"// {l} -> {p}\n")
 
 
 try:

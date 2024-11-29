@@ -1,7 +1,8 @@
 #! /bin/sh
+source .venv/bin/activate
 if [ $# -ne 0 ]
   then
-    poetry run python src/run_test.py $@
+    python src/run_test.py $@
   else 
-    poetry run python src/run_test.py
+    python src/run_test.py
 fi

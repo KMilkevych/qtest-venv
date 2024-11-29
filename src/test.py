@@ -151,7 +151,7 @@ def test(
 
     match tool:
         case tool if tool in ["qt-gl", "qt-cd"]:
-            command = f"./qt ../{input} -p {platform} -t {time_limit} -m sat -s {'glucose42' if tool == 'qt-gl' else 'cadical153'} {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
+            command = f"python src/qt.py ../{input} -p {platform} -t {time_limit} -m sat -s {'glucose42' if tool == 'qt-gl' else 'cadical153'} {'-cx' if cx_optimal else ''} {'-swap' if swap_optimal else ''} {'-anc' if ancillaries else ''} -out ../tmp/output.qasm -init ../tmp/initial_mapping.txt"
             try:
                 output = run(command, "qt", time_limit)
             except subprocess.TimeoutExpired:
@@ -198,7 +198,7 @@ def test(
             if not swap_optimal:
                 raise ValueError("Q-Synth is always SWAP-optimal.")
 
-            command = f"poetry run python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {'rigetti-80' if platform == 'rigetti80' else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit}"
+            command = f"python q-synth.py -b1 {'-a1' if ancillaries else '-a0'} -m sat -s cd153 -p {'rigetti-80' if platform == 'rigetti80' else platform} -v3 ../{input} ../tmp/output.qasm -t {time_limit}"
             try:
                 output = run(command, "Q-Synth", time_limit)
             except subprocess.TimeoutExpired:
@@ -250,7 +250,7 @@ def test(
             else:
                 circuit_path = input
 
-            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
+            command = f"python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --sabre"
 
             try:
                 output = run(command, "OLSQ2", time_limit)
@@ -322,7 +322,7 @@ def test(
                 circuit_path = "tmp/tmp_circuit.qasm"
             else:
                 circuit_path = input
-            command = f"poetry run python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
+            command = f"python run_olsq.py --dt {platform} --qf ../{circuit_path} --swap_duration 3 {'--swap' if swap_optimal else ''} --f ../tmp --tran --sabre"
 
             try:
                 output = run(command, "OLSQ2", time_limit)

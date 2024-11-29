@@ -1,5 +1,0 @@
-.vscode/
-.venv/
-**/.venv/
-**/__pycache__
-tmp/

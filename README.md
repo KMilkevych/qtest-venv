@@ -1,6 +1,6 @@
 # qtest
 
-> This tool was developed in relation a Master thesis at the Department of Computer Science, Aarhus University by [Anders Benjamin Clausen](https://github.com/anbclausen) and [Anna Blume Jakobsen](https://github.com/AnnaBlume99). It is here to make our experimental setup public and is not intended to be used.
+This is a _fork_ of [qtest](https://github.com/anbclausen/qtest) which does _not_ use poetry for dependency management.
 
 A tool for comparing and testing `qt` (QuilLS), `q-synth`, `olsq2`, `tb-olsq2` and `sabre`.
 
@@ -13,27 +13,10 @@ A tool for comparing and testing `qt` (QuilLS), `q-synth`, `olsq2`, `tb-olsq2` a
 It is important to carry out the installation in this order:
 
 ```bash
-git clone https://github.com/anbclausen/qtest.git --recurse-submodules
-cd qtest
-git submodule update --recursive --init 
-patch -p1 < patch.diff
-cd qt
-poetry install
-cd ..
-cd Q-Synth
-poetry install
-cd ..
-cd OLSQ2
-poetry install
-cd ..
-poetry install
+git clone https://github.com/KMilkevych/qtest-venv.git --recurse-submodules
+cd qtest-venv
+./install.sh
 ```
-
-Note, `qtest` was designed to work with very specific versions of the tools. To get a setup that works downgrade:
-
-- `qt` to commit `253c0ae`
-- `Q-Synth` to commit `553d54c`
-- `OLSQ2` to commit `0ce4a6f`
 
 ## Usage
 

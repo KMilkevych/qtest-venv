@@ -17,6 +17,12 @@ git clone https://github.com/KMilkevych/qtest-venv.git --recurse-submodules
 cd qtest-venv
 ./install.sh
 ```
+if the above does not work, please try
+```bash
+git clone https://github.com/KMilkevych/qtest-venv.git --recurse-submodules
+cd qtest-venv
+source install.sh
+```
 
 ## Usage
 
